@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -244,6 +245,24 @@ async def test_render_failure_logs_only_safe_diagnostics(
     assert secret_text not in caplog.text
     assert hidden_sender not in caplog.text
     assert "RuntimeError" in caplog.text
+
+
+async def test_success_log_reports_render_duration_without_source_text(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_text = "private render timing sentinel"
+    message = FakeMessage(text=source_text)
+    service = StubSpeechService(RenderedVoice(VoiceAudio(b"audio")))
+    clock_values = iter((100.0, 101.23456))
+    monkeypatch.setattr(time, "perf_counter", lambda: next(clock_values))
+
+    with caplog.at_level(logging.INFO):
+        await handle_text(as_message(message), as_user(FakeUser()), as_service(service))
+
+    assert "speech_rendered" in caplog.text
+    assert "render_duration_seconds=1.235" in caplog.text
+    assert source_text not in caplog.text
 
 
 async def test_upload_failure_is_not_retried_or_logged_with_content(

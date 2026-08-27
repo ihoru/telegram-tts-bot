@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from aiogram import Router
 from aiogram.enums import ChatType
@@ -85,6 +86,7 @@ async def handle_text(
         await _safe_reply(message, message_text(locale, MessageKey.TEXT_TOO_LONG), "text_too_long")
         return
 
+    render_started = time.perf_counter()
     try:
         result = await speech_service.try_render(user_id=event_from_user.id, text=text)
     except Exception as error:
@@ -105,10 +107,12 @@ async def handle_text(
         await _safe_reply(message, message_text(locale, key), result.reason.value)
         return
 
+    render_duration_seconds = time.perf_counter() - render_started
     logger.info(
-        "speech_rendered characters=%d output_bytes=%d",
+        "speech_rendered characters=%d output_bytes=%d render_duration_seconds=%.3f",
         len(text),
         len(result.audio.data),
+        render_duration_seconds,
     )
     voice = BufferedInputFile(result.audio.data, filename=result.audio.filename)
     try:
