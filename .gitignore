@@ -1,0 +1,25 @@
+# Python and uv
+__pycache__/
+*.py[cod]
+*.egg-info/
+.coverage
+.mypy_cache/
+.pre-commit-cache/
+.pytest_cache/
+.ruff_cache/
+.uv-cache/
+.venv/
+build/
+dist/
+htmlcov/
+
+# Local configuration and generated data
+.env
+.models/
+*.ogg
+*.wav
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
