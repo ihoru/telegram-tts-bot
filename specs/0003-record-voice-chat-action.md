@@ -1,7 +1,7 @@
 ---
 id: "0003"
 title: Record-voice chat action
-status: accepted
+status: implemented
 created: 2026-08-27
 updated: 2026-08-27
 supersedes: null
@@ -83,6 +83,12 @@ unchanged.
 
 Ship as a backward-compatible handler change. Rollback removes the activity helper and
 its invocation; no data or configuration migration exists.
+
+## Implementation record
+
+Implemented by `50b0f7d`. Verification completed with Ruff lint and format checks,
+strict mypy, and 83 passing tests with one skipped opt-in real-model test. Branch
+coverage was 92.58%.
 
 ## Alternatives
 
