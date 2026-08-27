@@ -6,7 +6,7 @@ import logging
 import time
 
 from aiogram import Router
-from aiogram.enums import ChatType
+from aiogram.enums import ChatAction, ChatType
 from aiogram.filters import Command, CommandStart, Filter
 from aiogram.types import BufferedInputFile, Message, User
 
@@ -86,6 +86,7 @@ async def handle_text(
         await _safe_reply(message, message_text(locale, MessageKey.TEXT_TOO_LONG), "text_too_long")
         return
 
+    await _safe_record_voice_action(message)
     render_started = time.perf_counter()
     try:
         result = await speech_service.try_render(user_id=event_from_user.id, text=text)
@@ -129,6 +130,23 @@ async def handle_unsupported(message: Message, event_from_user: User) -> None:
     """Explain the text-only contract for media, including forwarded captions."""
     locale = locale_for_language_code(event_from_user.language_code)
     await _safe_reply(message, message_text(locale, MessageKey.UNSUPPORTED), "unsupported")
+
+
+async def _safe_record_voice_action(message: Message) -> None:
+    bot = message.bot
+    if bot is None:
+        logger.warning("chat_action_skipped action=record_voice reason=bot_unbound")
+        return
+    try:
+        await bot.send_chat_action(
+            chat_id=message.chat.id,
+            action=ChatAction.RECORD_VOICE,
+        )
+    except Exception as error:
+        logger.warning(
+            "chat_action_failed action=record_voice exception_type=%s",
+            type(error).__name__,
+        )
 
 
 async def _safe_answer(message: Message, text: str, *, response_kind: str) -> None:

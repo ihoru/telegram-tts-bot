@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import pytest
 from aiogram import Bot
-from aiogram.enums import ChatType
+from aiogram.enums import ChatAction, ChatType
 from aiogram.types import BufferedInputFile, Chat, Message, Update, User
 
 from telegram_tts_bot.activity import HandlerActivity
@@ -41,6 +41,26 @@ class FakeUser:
 
 
 @dataclass
+class FakeBot:
+    chat_actions: list[tuple[int, str]] = field(default_factory=list)
+    events: list[str] | None = None
+    send_error: Exception | None = None
+
+    async def send_chat_action(self, *, chat_id: int, action: str) -> bool:
+        if self.send_error is not None:
+            raise self.send_error
+        self.chat_actions.append((chat_id, action))
+        if self.events is not None:
+            self.events.append("chat_action")
+        return True
+
+
+@dataclass
+class FakeChat:
+    id: int = 42
+
+
+@dataclass
 class FakeMessage:
     text: str | None = None
     caption: str | None = None
@@ -49,6 +69,9 @@ class FakeMessage:
     replies: list[str] = field(default_factory=list)
     voices: list[BufferedInputFile] = field(default_factory=list)
     send_error: Exception | None = None
+    bot: FakeBot = field(default_factory=FakeBot)
+    chat: FakeChat = field(default_factory=FakeChat)
+    events: list[str] | None = None
 
     async def answer(self, text: str) -> None:
         if self.send_error is not None:
@@ -64,15 +87,25 @@ class FakeMessage:
         if self.send_error is not None:
             raise self.send_error
         self.voices.append(voice)
+        if self.events is not None:
+            self.events.append("voice")
 
 
 class StubSpeechService:
-    def __init__(self, result: RenderedVoice | RenderRejected | Exception) -> None:
+    def __init__(
+        self,
+        result: RenderedVoice | RenderRejected | Exception,
+        *,
+        events: list[str] | None = None,
+    ) -> None:
         self.result = result
         self.calls: list[tuple[int, str]] = []
+        self.events = events
 
     async def try_render(self, *, user_id: int, text: str) -> RenderedVoice | RenderRejected:
         self.calls.append((user_id, text))
+        if self.events is not None:
+            self.events.append("render")
         if isinstance(self.result, Exception):
             raise self.result
         return self.result
@@ -116,6 +149,7 @@ async def test_direct_copied_and_forwarded_text_use_exact_same_path(
     )
 
     assert service.calls == [(88, supplied_text)]
+    assert message.bot.chat_actions == [(message.chat.id, ChatAction.RECORD_VOICE)]
     assert len(message.voices) == 1
     assert message.voices[0].data == b"ogg"
     assert message.voices[0].filename == "voice.ogg"
@@ -155,6 +189,7 @@ async def test_invalid_bot_text_is_rejected_before_rendering(text: str, key: Mes
     await handle_text(as_message(message), as_user(FakeUser()), as_service(service))
 
     assert service.calls == []
+    assert message.bot.chat_actions == []
     assert message.replies == [message_text(Locale.EN, key)]
 
 
@@ -197,12 +232,19 @@ async def test_dispatcher_routes_real_private_message_model(
 ) -> None:
     service = StubSpeechService(RenderedVoice(VoiceAudio(b"ogg")))
     dispatcher = create_dispatcher(as_service(service), HandlerActivity())
+    sent_actions: list[tuple[int, str]] = []
     sent_voices: list[BufferedInputFile] = []
+
+    async def capture_chat_action(_bot: Bot, *, chat_id: int, action: str) -> bool:
+        sent_actions.append((chat_id, action))
+        await asyncio.sleep(0)
+        return True
 
     async def capture_voice(_message: Message, voice: BufferedInputFile) -> None:
         sent_voices.append(voice)
         await asyncio.sleep(0)
 
+    monkeypatch.setattr(Bot, "send_chat_action", capture_chat_action)
     monkeypatch.setattr(Message, "reply_voice", capture_voice)
     bot = Bot(token="123456:local-test-token")
     update = Update(
@@ -227,7 +269,46 @@ async def test_dispatcher_routes_real_private_message_model(
         await bot.session.close()
 
     assert service.calls == [(88, "Прочитай это")]
+    assert sent_actions == [(88, ChatAction.RECORD_VOICE)]
     assert [voice.data for voice in sent_voices] == [b"ogg"]
+
+
+async def test_record_voice_action_precedes_render_and_upload() -> None:
+    events: list[str] = []
+    message = FakeMessage(
+        text="Порядок действий",
+        bot=FakeBot(events=events),
+        events=events,
+    )
+    service = StubSpeechService(
+        RenderedVoice(VoiceAudio(b"audio")),
+        events=events,
+    )
+
+    await handle_text(as_message(message), as_user(FakeUser()), as_service(service))
+
+    assert events == ["chat_action", "render", "voice"]
+
+
+async def test_chat_action_failure_does_not_prevent_rendering_or_leak_content(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    source_text = "private chat action failure sentinel"
+    telegram_error_text = "private Telegram error details"
+    message = FakeMessage(
+        text=source_text,
+        bot=FakeBot(send_error=RuntimeError(telegram_error_text)),
+    )
+    service = StubSpeechService(RenderedVoice(VoiceAudio(b"audio")))
+
+    with caplog.at_level(logging.WARNING):
+        await handle_text(as_message(message), as_user(FakeUser()), as_service(service))
+
+    assert service.calls == [(42, source_text)]
+    assert len(message.voices) == 1
+    assert "chat_action_failed action=record_voice exception_type=RuntimeError" in caplog.text
+    assert source_text not in caplog.text
+    assert telegram_error_text not in caplog.text
 
 
 async def test_render_failure_logs_only_safe_diagnostics(
