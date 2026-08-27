@@ -29,7 +29,7 @@ class PrivateChatFilter(Filter):
     """Select private messages without dispatching a sync filter to a worker thread."""
 
     async def __call__(self, message: Message) -> bool:
-        return message.chat.type is ChatType.PRIVATE
+        return message.chat.type == ChatType.PRIVATE
 
 
 class TextMessageFilter(Filter):

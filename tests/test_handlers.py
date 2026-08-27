@@ -1,12 +1,15 @@
+import asyncio
 import logging
 from dataclasses import dataclass, field
-from types import SimpleNamespace
+from datetime import UTC, datetime
 from typing import Any, cast
 
 import pytest
+from aiogram import Bot
 from aiogram.enums import ChatType
-from aiogram.types import BufferedInputFile, Message, User
+from aiogram.types import BufferedInputFile, Chat, Message, Update, User
 
+from telegram_tts_bot.activity import HandlerActivity
 from telegram_tts_bot.bot_service import (
     BotSpeechService,
     RejectionReason,
@@ -24,7 +27,10 @@ from telegram_tts_bot.handlers import (
     handle_unsupported,
 )
 from telegram_tts_bot.localization import Locale, MessageKey, message_text
+from telegram_tts_bot.runtime import create_dispatcher
 from telegram_tts_bot.speech import VoiceAudio
+
+MESSAGE_DATE = datetime(2026, 8, 27, tzinfo=UTC)
 
 
 @dataclass
@@ -160,32 +166,67 @@ async def test_unsupported_caption_gets_guidance_without_rendering() -> None:
 
 
 async def test_private_and_text_filters_ignore_group_and_caption_content() -> None:
-    private_text = cast(
-        Message,
-        cast(
-            Any,
-            SimpleNamespace(chat=SimpleNamespace(type=ChatType.PRIVATE), text="text"),
-        ),
+    private_text = Message(
+        message_id=1,
+        date=MESSAGE_DATE,
+        chat=Chat(id=1, type=ChatType.PRIVATE),
+        text="text",
     )
-    group_text = cast(
-        Message,
-        cast(
-            Any,
-            SimpleNamespace(chat=SimpleNamespace(type=ChatType.GROUP), text="text"),
-        ),
+    group_text = Message(
+        message_id=2,
+        date=MESSAGE_DATE,
+        chat=Chat(id=-1, type=ChatType.GROUP),
+        text="text",
     )
-    private_caption = cast(
-        Message,
-        cast(
-            Any,
-            SimpleNamespace(chat=SimpleNamespace(type=ChatType.PRIVATE), text=None),
-        ),
+    private_caption = Message(
+        message_id=3,
+        date=MESSAGE_DATE,
+        chat=Chat(id=1, type=ChatType.PRIVATE),
+        caption="caption",
     )
 
     assert await PrivateChatFilter()(private_text)
     assert not await PrivateChatFilter()(group_text)
     assert await TextMessageFilter()(private_text)
     assert not await TextMessageFilter()(private_caption)
+
+
+async def test_dispatcher_routes_real_private_message_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = StubSpeechService(RenderedVoice(VoiceAudio(b"ogg")))
+    dispatcher = create_dispatcher(as_service(service), HandlerActivity())
+    sent_voices: list[BufferedInputFile] = []
+
+    async def capture_voice(_message: Message, voice: BufferedInputFile) -> None:
+        sent_voices.append(voice)
+        await asyncio.sleep(0)
+
+    monkeypatch.setattr(Message, "reply_voice", capture_voice)
+    bot = Bot(token="123456:local-test-token")
+    update = Update(
+        update_id=1,
+        message=Message(
+            message_id=10,
+            date=MESSAGE_DATE,
+            chat=Chat(id=88, type=ChatType.PRIVATE),
+            from_user=User(
+                id=88,
+                is_bot=False,
+                first_name="Test",
+                language_code="en",
+            ),
+            text="Прочитай это",
+        ),
+    )
+
+    try:
+        await dispatcher.feed_update(bot, update)
+    finally:
+        await bot.session.close()
+
+    assert service.calls == [(88, "Прочитай это")]
+    assert [voice.data for voice in sent_voices] == [b"ogg"]
 
 
 async def test_render_failure_logs_only_safe_diagnostics(
