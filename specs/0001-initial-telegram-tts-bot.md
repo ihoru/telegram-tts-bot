@@ -1,13 +1,17 @@
 ---
 id: "0001"
 title: Initial Telegram TTS bot
-status: implemented
+status: superseded
 created: 2026-08-27
 updated: 2026-08-27
 supersedes: null
+superseded_by: "0002"
 ---
 
 # SPEC-0001: Initial Telegram TTS bot
+
+Superseded by SPEC-0002. SPEC-0002 retains this contract except for its explicit
+BotFather welcome-message and privacy-policy additions.
 
 ## Summary
 

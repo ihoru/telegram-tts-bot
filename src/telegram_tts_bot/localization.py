@@ -29,11 +29,12 @@ class MessageKey(StrEnum):
 
 _RU_MESSAGES: Final = MappingProxyType({
     MessageKey.START: (
-        'Привет! Я "Вслух" — превращаю текст в голос.\n\n'
-        "Отправьте обычное текстовое сообщение или перешлите текст из другого чата. "
-        "Я отвечу голосовой заметкой.\n\n"
-        "Озвучивание выполняется локально; бот не сохраняет сообщения и аудио. "
-        "Если бот занят, повторите попытку чуть позже.\n\n"
+        'Привет! Я "Вслух".\n\n'
+        "Я превращаю обычные и пересланные текстовые сообщения в голосовые заметки "
+        "на русском языке.\n\n"
+        "Отправьте мне текст или перешлите текстовое сообщение — я отвечу готовой "
+        "голосовой заметкой.\n\n"
+        "Озвучивание выполняется локально. Я не сохраняю сообщения и созданное аудио.\n\n"
         "/help — подробная справка"
     ),
     MessageKey.HELP: (
@@ -64,11 +65,11 @@ _RU_MESSAGES: Final = MappingProxyType({
 
 _EN_MESSAGES: Final = MappingProxyType({
     MessageKey.START: (
-        "Hello! I am Vslukh — I turn Russian text into voice.\n\n"
-        "Send a text message or forward text from another chat. "
-        "I will reply with a voice note.\n\n"
-        "Speech is generated locally; this bot does not store messages or audio. "
-        "If the bot is busy, please try again later.\n\n"
+        "Hello! I am Vslukh.\n\n"
+        "I turn regular and forwarded text messages into Russian voice notes.\n\n"
+        "Send me text or forward a text message, and I will reply with a ready-to-play "
+        "voice note.\n\n"
+        "Speech is generated locally. I do not store messages or generated audio.\n\n"
         "/help — detailed help"
     ),
     MessageKey.HELP: (

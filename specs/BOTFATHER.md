@@ -1,12 +1,13 @@
 # BotFather launch pack
 
-This is the canonical copy/paste profile for SPEC-0001. Record the final username and
+This is the canonical copy/paste profile for SPEC-0002. Record the final username and
 verification date at the bottom; never record the token.
 
 Telegram currently limits display names to 64 characters, usernames to 5-32 Latin
 letters, numbers, or underscores ending in `bot`, About text to 120 characters, full
 descriptions to 512 characters, command names to 1-32 characters, and command
-descriptions to 1-256 characters. Username availability must be checked live.
+descriptions to 1-256 characters. A privacy-policy URL must be publicly reachable over
+HTTPS. Username availability must be checked live.
 
 ## Identity
 
@@ -64,6 +65,14 @@ English:
 I turn Russian text into Telegram voice notes. Send your own text or forward a text message and I will return ready-to-play audio. Speech generation runs locally; the bot stores neither messages nor audio.
 ```
 
+## Privacy policy
+
+The public page contains the full policy in Russian and English:
+
+```text
+https://vslukh-privacy.ihoruru.chatgpt.site
+```
+
 ## Commands
 
 Russian:
@@ -80,18 +89,18 @@ start - Start using the bot
 help - Show detailed help
 ```
 
-## Runtime copy
-
-### `/start`
+## Welcome message (`/start`)
 
 Russian:
 
 ```text
-Привет! Я "Вслух" — превращаю текст в голос.
+Привет! Я "Вслух".
 
-Отправьте обычное текстовое сообщение или перешлите текст из другого чата. Я отвечу голосовой заметкой.
+Я превращаю обычные и пересланные текстовые сообщения в голосовые заметки на русском языке.
 
-Озвучивание выполняется локально; бот не сохраняет сообщения и аудио. Если бот занят, повторите попытку чуть позже.
+Отправьте мне текст или перешлите текстовое сообщение — я отвечу готовой голосовой заметкой.
+
+Озвучивание выполняется локально. Я не сохраняю сообщения и созданное аудио.
 
 /help — подробная справка
 ```
@@ -99,14 +108,18 @@ Russian:
 English:
 
 ```text
-Hello! I am Vslukh — I turn Russian text into voice.
+Hello! I am Vslukh.
 
-Send a text message or forward text from another chat. I will reply with a voice note.
+I turn regular and forwarded text messages into Russian voice notes.
 
-Speech is generated locally; this bot does not store messages or audio. If the bot is busy, please try again later.
+Send me text or forward a text message, and I will reply with a ready-to-play voice note.
+
+Speech is generated locally. I do not store messages or generated audio.
 
 /help — detailed help
 ```
+
+## Runtime copy
 
 ### `/help`
 
@@ -153,14 +166,16 @@ shadows, gradients, or tiny detail and stays inside the central 70% circle-safe 
    available username from the ordered list.
 2. Store the issued token only in the runtime secret. Never paste it into this repository,
    specifications, logs, shell history, Docker build arguments, or committed CI settings.
-3. Set the localized display names, About text, full descriptions, and command lists from
-   this document.
-4. Run `/setuserpic` and upload `assets/vslukh-avatar.png`.
-5. Run `/setjoingroups` and disable group joining.
-6. Leave group privacy enabled and inline mode disabled. Do not configure domains,
+3. Set the localized display names, About text, full descriptions, command lists, and
+   welcome copy from this document.
+4. Configure the privacy-policy URL from this document.
+5. Run `/setuserpic` and upload `assets/vslukh-avatar.png`.
+6. Run `/setjoingroups` and disable group joining.
+7. Leave group privacy enabled and inline mode disabled. Do not configure domains,
    payments, Mini Apps, description media, or extra commands for v1.
-7. In Russian and English Telegram clients, verify the profile, `/start`, `/help`, direct
-   text, forwarded text, unsupported media guidance, and a returned voice note.
+8. In Russian and English Telegram clients, verify the profile, privacy-policy link,
+   `/start`, `/help`, direct text, forwarded text, unsupported media guidance, and a
+   returned voice note.
 
 BotFather does not provide a friends-only private-message allowlist for this ordinary
 bot. Anyone who discovers the username can send it messages.

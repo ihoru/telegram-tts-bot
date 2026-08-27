@@ -93,7 +93,22 @@ def test_english_locale_is_the_fallback(language_code: str | None) -> None:
 
 
 def test_start_and_help_copy_match_the_accepted_profile() -> None:
-    assert message_text(Locale.RU, MessageKey.START).startswith('Привет! Я "Вслух"')
-    assert message_text(Locale.EN, MessageKey.START).startswith("Hello! I am Vslukh")
+    assert message_text(Locale.RU, MessageKey.START) == (
+        'Привет! Я "Вслух".\n\n'
+        "Я превращаю обычные и пересланные текстовые сообщения в голосовые заметки "
+        "на русском языке.\n\n"
+        "Отправьте мне текст или перешлите текстовое сообщение — я отвечу готовой "
+        "голосовой заметкой.\n\n"
+        "Озвучивание выполняется локально. Я не сохраняю сообщения и созданное аудио.\n\n"
+        "/help — подробная справка"
+    )
+    assert message_text(Locale.EN, MessageKey.START) == (
+        "Hello! I am Vslukh.\n\n"
+        "I turn regular and forwarded text messages into Russian voice notes.\n\n"
+        "Send me text or forward a text message, and I will reply with a ready-to-play "
+        "voice note.\n\n"
+        "Speech is generated locally. I do not store messages or generated audio.\n\n"
+        "/help — detailed help"
+    )
     assert "данных пересылки" in message_text(Locale.RU, MessageKey.HELP)
     assert "forwarding details" in message_text(Locale.EN, MessageKey.HELP)
