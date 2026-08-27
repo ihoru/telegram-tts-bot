@@ -1,0 +1,149 @@
+"""Private-chat Telegram handlers for commands, text, and unsupported content."""
+
+from __future__ import annotations
+
+import logging
+
+from aiogram import Router
+from aiogram.enums import ChatType
+from aiogram.filters import Command, CommandStart, Filter
+from aiogram.types import BufferedInputFile, Message, User
+
+from telegram_tts_bot.bot_service import (
+    BotSpeechService,
+    RejectionReason,
+    RenderRejected,
+)
+from telegram_tts_bot.localization import (
+    MessageKey,
+    locale_for_language_code,
+    message_text,
+)
+
+MAX_TELEGRAM_TEXT_LENGTH = 4096
+
+logger = logging.getLogger(__name__)
+
+
+class PrivateChatFilter(Filter):
+    """Select private messages without dispatching a sync filter to a worker thread."""
+
+    async def __call__(self, message: Message) -> bool:
+        return message.chat.type is ChatType.PRIVATE
+
+
+class TextMessageFilter(Filter):
+    """Select messages with text, including forwarded and copied text."""
+
+    async def __call__(self, message: Message) -> bool:
+        return message.text is not None
+
+
+def create_router() -> Router:
+    """Create the private-chat-only router in deterministic handler order."""
+    router = Router(name=__name__)
+    router.message.filter(PrivateChatFilter())
+    router.message.register(handle_start, CommandStart())
+    router.message.register(handle_help, Command("help"))
+    router.message.register(handle_text, TextMessageFilter())
+    router.message.register(handle_unsupported)
+    return router
+
+
+async def handle_start(message: Message, event_from_user: User) -> None:
+    """Send the localized welcome message."""
+    await _safe_answer(
+        message,
+        message_text(locale_for_language_code(event_from_user.language_code), MessageKey.START),
+        response_kind="start",
+    )
+
+
+async def handle_help(message: Message, event_from_user: User) -> None:
+    """Send detailed localized usage help."""
+    await _safe_answer(
+        message,
+        message_text(locale_for_language_code(event_from_user.language_code), MessageKey.HELP),
+        response_kind="help",
+    )
+
+
+async def handle_text(
+    message: Message,
+    event_from_user: User,
+    speech_service: BotSpeechService,
+) -> None:
+    """Render direct, copied, and forwarded text through the same path."""
+    text = message.text
+    if text is None:
+        return
+    locale = locale_for_language_code(event_from_user.language_code)
+    if not text.strip():
+        await _safe_reply(message, message_text(locale, MessageKey.EMPTY_TEXT), "empty_text")
+        return
+    if len(text) > MAX_TELEGRAM_TEXT_LENGTH:
+        await _safe_reply(message, message_text(locale, MessageKey.TEXT_TOO_LONG), "text_too_long")
+        return
+
+    try:
+        result = await speech_service.try_render(user_id=event_from_user.id, text=text)
+    except Exception as error:
+        logger.error(
+            "speech_render_failed exception_type=%s characters=%d",
+            type(error).__name__,
+            len(text),
+        )
+        await _safe_reply(message, message_text(locale, MessageKey.RENDER_FAILED), "render_failed")
+        return
+
+    if isinstance(result, RenderRejected):
+        key = (
+            MessageKey.USER_BUSY
+            if result.reason is RejectionReason.USER_CAPACITY
+            else MessageKey.GLOBAL_BUSY
+        )
+        await _safe_reply(message, message_text(locale, key), result.reason.value)
+        return
+
+    logger.info(
+        "speech_rendered characters=%d output_bytes=%d",
+        len(text),
+        len(result.audio.data),
+    )
+    voice = BufferedInputFile(result.audio.data, filename=result.audio.filename)
+    try:
+        await message.reply_voice(voice)
+    except Exception as error:
+        logger.error(
+            "voice_upload_failed exception_type=%s output_bytes=%d",
+            type(error).__name__,
+            len(result.audio.data),
+        )
+
+
+async def handle_unsupported(message: Message, event_from_user: User) -> None:
+    """Explain the text-only contract for media, including forwarded captions."""
+    locale = locale_for_language_code(event_from_user.language_code)
+    await _safe_reply(message, message_text(locale, MessageKey.UNSUPPORTED), "unsupported")
+
+
+async def _safe_answer(message: Message, text: str, *, response_kind: str) -> None:
+    try:
+        await message.answer(text)
+    except Exception as error:
+        _log_text_send_failure(error, response_kind)
+
+
+async def _safe_reply(message: Message, text: str, response_kind: str) -> None:
+    try:
+        await message.reply(text)
+    except Exception as error:
+        _log_text_send_failure(error, response_kind)
+
+
+def _log_text_send_failure(error: Exception, response_kind: str) -> None:
+    logger.error(
+        "text_response_failed response_kind=%s exception_type=%s",
+        response_kind,
+        type(error).__name__,
+    )
