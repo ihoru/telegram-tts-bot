@@ -23,7 +23,7 @@ Statuses are `draft`, `accepted`, `implemented`, `rejected`, and `superseded`.
 
 | ID | Title | Status | Superseded by |
 | --- | --- | --- | --- |
-| 0001 | Initial Telegram TTS bot | accepted | - |
+| 0001 | Initial Telegram TTS bot | implemented | - |
 
 `BOTFATHER.md` contains the operational profile pack accepted by SPEC-0001. Changes to
 that pack require a new numbered specification.

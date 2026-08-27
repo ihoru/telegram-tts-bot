@@ -1,7 +1,7 @@
 ---
 id: "0001"
 title: Initial Telegram TTS bot
-status: accepted
+status: implemented
 created: 2026-08-27
 updated: 2026-08-27
 supersedes: null
@@ -187,6 +187,21 @@ image, and semantic tags beginning at `v0.1.0`. CI runs on every push and pull r
 The release workflow reruns verification before publishing version, SHA, and `latest`
 GHCR tags. Rollback means redeploying a previous immutable image tag; there is no data
 migration or persistent state to reverse.
+
+## Implementation record
+
+Implemented on 2026-08-27 by:
+
+- `665b6da` — Python toolchain, lockfile, pre-commit, and local quality gates.
+- `e44cb55` — replaceable speech renderer, pinned Piper adapter, and stdin CLI.
+- `9b7c79a` — Telegram runtime, forwarding behavior, concurrency, and shutdown.
+- `629c73b` — documentation, immutable container, CI, and release automation.
+
+Verification completed with 79 passing tests and one skipped opt-in real-model test,
+92.84% branch coverage, Ruff lint and format checks, strict mypy, locked package builds,
+and a non-root production-image audit. The real model also completed the five-render
+two-CPU/1 GiB stress scenario and produced verified mono 48 kHz OGG/Opus output. No
+release tag was created as part of implementation.
 
 ## Alternatives
 
