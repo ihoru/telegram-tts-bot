@@ -20,6 +20,7 @@ htmlcov/
 .models/
 *.ogg
 *.wav
+*.txt
 
 # Editors and operating systems
 .DS_Store
