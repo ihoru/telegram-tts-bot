@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img"
+     aria-labelledby="title description">
+  <title id="title">Vslukh avatar</title>
+  <desc id="description">
+    A white speech bubble with a three-bar sound wave and turquoise accent on navy.
+  </desc>
+  <rect width="1024" height="1024" fill="#0B132B"/>
+  <path fill="#FFFFFF" d="M362 224h300c99 0 180 81 180 180v142c0 99-81 180-180 180H492L334
+    820l35-94h-7c-99 0-180-81-180-180V404c0-99 81-180 180-180Z"/>
+  <rect x="338" y="430" width="70" height="118" rx="35" fill="#0B132B"/>
+  <rect x="477" y="360" width="70" height="258" rx="35" fill="#21D4C2"/>
+  <rect x="616" y="397" width="70" height="184" rx="35" fill="#0B132B"/>
+</svg>

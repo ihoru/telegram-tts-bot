@@ -1,5 +1,5 @@
 [build-system]
-requires = ["uv_build>=0.9.26,<0.10.0"]
+requires = ["uv_build==0.11.28"]
 build-backend = "uv_build"
 
 [project]
@@ -9,13 +9,13 @@ description = "A local-first Telegram bot that turns text into Russian voice not
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
 license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 authors = [{ name = "Igor Polyakov" }]
 keywords = ["telegram", "text-to-speech", "piper", "aiogram"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
   "Framework :: AsyncIO",
-  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.14",
   "Typing :: Typed",
@@ -40,6 +40,17 @@ dev = [
 
 [tool.uv]
 default-groups = ["dev"]
+
+[tool.uv.build-backend]
+source-include = [
+  "AGENTS.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  "THIRD_PARTY_NOTICES.md",
+  "assets/**",
+  "licenses/**",
+  "specs/**",
+]
 
 [tool.ruff]
 target-version = "py314"

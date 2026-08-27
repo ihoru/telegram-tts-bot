@@ -1,0 +1,209 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Verify release tag and quality
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.11.28"
+          enable-cache: true
+          cache-python: true
+          python-version: "3.14"
+      - name: Require exact semantic tag and project version
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must be exactly vMAJOR.MINOR.PATCH." >&2
+            exit 1
+          fi
+          project_version=$(uv version --short)
+          if [[ "v$project_version" != "$GITHUB_REF_NAME" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match project version $project_version." >&2
+            exit 1
+          fi
+      - name: Sync locked environment
+        run: uv sync --locked --all-groups
+      - name: Run Ruff lint
+        run: uv run --locked ruff check .
+      - name: Check Ruff formatting
+        run: uv run --locked ruff format --check .
+      - name: Run strict mypy
+        run: uv run --locked mypy src tests
+      - name: Run test suite
+        run: uv run --locked pytest
+      - name: Build Python artifacts
+        run: uv build
+
+  stress:
+    name: Constrained five-render stress test
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Build integration-test image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          target: test
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: vslukh:test
+          cache-from: type=gha,scope=test
+          cache-to: type=gha,mode=max,scope=test
+      - name: Run real shared-model stress test under host limits
+        run: |
+          docker run --rm \
+            --cpus 2 \
+            --memory 1g \
+            --memory-swap 1g \
+            --entrypoint /usr/bin/time \
+            vslukh:test \
+            -v uv run --locked pytest --no-cov -m "integration and stress" -s
+
+  publish:
+    name: Publish GHCR image and GitHub release
+    needs: [quality, stress]
+    runs-on: ubuntu-24.04
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.11.28"
+          enable-cache: true
+          cache-python: true
+          python-version: "3.14"
+      - name: Resolve release coordinates
+        id: release
+        shell: bash
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          project_version=$(uv version --short)
+          test "$version" = "$project_version"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+          printf 'image=ghcr.io/%s\n' "${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate image metadata
+        id: metadata
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ steps.release.outputs.image }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha,format=long,prefix=
+            type=raw,value=latest
+      - name: Build release image without publishing
+        id: image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          target: runtime
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.release.outputs.version }}
+            VCS_REF=${{ github.sha }}
+          cache-from: type=gha,scope=runtime
+          cache-to: type=gha,mode=max,scope=runtime
+      - name: Verify the exact release image
+        run: >-
+          ./scripts/verify-runtime-image.sh
+          "${{ steps.release.outputs.image }}:${{ steps.release.outputs.version }}"
+      - name: Push verified image tags
+        shell: bash
+        env:
+          IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
+        run: |
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              docker push "$tag"
+            fi
+          done <<<"$IMAGE_TAGS"
+      - name: Resolve and verify the published digest
+        id: digest
+        shell: bash
+        env:
+          IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
+          VERSION_TAG: ${{ steps.release.outputs.image }}:${{ steps.release.outputs.version }}
+        run: |
+          digest=$(docker buildx imagetools inspect "$VERSION_TAG" --format '{{.Manifest.Digest}}')
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Published image did not resolve to a SHA-256 digest." >&2
+            exit 1
+          fi
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              tag_digest=$(docker buildx imagetools inspect "$tag" --format '{{.Manifest.Digest}}')
+              test "$tag_digest" = "$digest"
+            fi
+          done <<<"$IMAGE_TAGS"
+          printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - name: Attest image provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.release.outputs.image }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ${{ steps.release.outputs.image }}@${{ steps.digest.outputs.digest }}
+          format: spdx-json
+          output-file: vslukh-container.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Attest image SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.release.outputs.image }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          sbom-path: vslukh-container.spdx.json
+          push-to-registry: true
+      - name: Build Python release artifacts
+        run: uv build
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          files: |
+            dist/*
+            vslukh-container.spdx.json
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          make_latest: true
