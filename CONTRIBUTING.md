@@ -24,28 +24,37 @@ contract should reference that contract and include a regression test.
 
 ## Set up the repository
 
-The supported development platform is Linux x86-64 with Python 3.14, uv, and FFmpeg.
+The supported development platform is Linux x86-64 with Python 3.14, uv, FFmpeg, and
+SoX. Real Qwen inference additionally needs an NVIDIA BF16-capable GPU.
 
 ```bash
 uv sync --locked --all-groups
 uv run pre-commit install
 ```
 
-Unit tests use fakes and do not need the real voice. Provision it only for integration
-work:
+Unit tests use fakes and do not need real models. Provision only the provider needed for
+integration work. Qwen provisioning reports human-readable per-file download sizes on
+stderr and handles Ctrl+C with exit status 130 and staging cleanup:
 
 ```bash
+uv run python -m telegram_tts_bot.speech.qwen_model
 uv run python -m telegram_tts_bot.speech.model --output-dir .models/silero
 ```
 
-Never commit `.env`, `.models`, generated OGG/WAV files, Telegram updates, or logs that
-contain user data.
+Long Qwen `tts-to-ogg` renders report content-free model-load and 500-character chunk
+progress on stderr. They remain sequential and may take minutes without FlashAttention.
+
+Never commit `.env`, `.models`, arbitrary generated OGG/WAV files, Telegram updates, or
+logs that contain user data. The only audio exception is immutable, manifest-listed
+synthetic comparison evidence under `auditions/`; follow SPEC-0006 and run its archive
+test before adding a result.
 
 ## Make a focused change
 
 - Keep Telegram concerns in handlers, admission policy in the bot service, speech behind
   `WaveSynthesizer`, encoding in the renderer, and construction in composition.
-- Keep handlers and the CLI independent of Silero and FFmpeg implementation details.
+- Keep handlers and the CLI independent of Qwen, Silero, and FFmpeg implementation
+  details.
 - Do not add runtime downloads, persistence, queues, provider registries, or deployment
   machinery without an accepted specification.
 - Preserve exact user input through the renderer and never include it in logs, exceptions,
@@ -67,7 +76,8 @@ uv run pre-commit run --all-files
 
 Pytest enforces at least 90% branch coverage. Tests marked `integration` require system
 dependencies or real model assets; tests marked `stress` exercise the constrained
-two-render path. Keep ordinary tests deterministic and network-free.
+Silero two-render path. The checked-in audition archive is validated offline but never
+regenerated in CI. Keep ordinary tests deterministic and network-free.
 
 Pre-commit intentionally runs Ruff with fixes. If it changes files, inspect them, stage
 them yourself, and rerun the commit. Hooks must never invoke `git add`.
@@ -81,7 +91,7 @@ A reviewable pull request:
 - includes tests at the narrowest responsible layer;
 - passes all CI jobs independently;
 - updates README, security, third-party, or BotFather material when those facts change;
-- contains no secrets, downloaded models, generated audio, or user text.
+- contains no secrets, downloaded models, unlisted generated audio, or user text.
 
 Keep commits cohesive and green. A typical feature sequence is specification, tool or
 interface support, behavior and tests, then operational/documentation polish. Maintainers

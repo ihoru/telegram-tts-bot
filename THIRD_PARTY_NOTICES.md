@@ -5,6 +5,31 @@ image, redistributes third-party software and model assets under their own terms
 summary is informational; the upstream license text and package metadata are
 authoritative.
 
+## Qwen3-TTS model and inference package
+
+- Creator: Qwen Team, Alibaba Cloud
+- Work: *Qwen3-TTS-12Hz-0.6B-CustomVoice*
+- Model: [Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice)
+- Immutable model revision: `85e237c12c027371202489a0ec509ded67b5e4b5`
+- Inference package: `qwen-tts==0.1.1`
+- Use: local mixed Russian-English synthesis with the `Aiden` or `Serena` speaker
+- License: Apache License 2.0
+
+The production image contains the inference package but not the model snapshot. The
+explicit provisioner downloads and verifies the complete eleven-file snapshot before
+runtime. The Apache 2.0 text distributed with `qwen-tts==0.1.1` is retained in
+[`licenses/qwen3-tts-Apache-2.0.txt`](licenses/qwen3-tts-Apache-2.0.txt).
+
+The two large model artifacts are integrity-pinned:
+
+| File | SHA-256 |
+| --- | --- |
+| `model.safetensors` | `bc3c7e785eb961179c25450d1acff03f839e0002f2f3a5aeb67b5735c0fa2adb` |
+| `speech_tokenizer/model.safetensors` | `836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258` |
+
+The full filename/checksum allowlist is maintained in
+`src/telegram_tts_bot/speech/qwen_model.py`.
+
 ## Silero speech model
 
 - Creator: Silero Team
@@ -33,25 +58,28 @@ The artifact is integrity-pinned:
 | --- | --- |
 | `v5_5_ru.pt` | `50081637b602126ee06cb3bc8a744d25651d2da149ee8864b9a379bfdd934437` |
 
-## PyTorch and NumPy
+## PyTorch, TorchAudio, and NumPy
 
-- [PyTorch](https://pytorch.org/) provides the CPU inference runtime. Its installed
+- [PyTorch](https://pytorch.org/) provides the CUDA Qwen and CPU Silero inference runtime.
+  Its installed
   package metadata records the expression `Apache-2.0 AND Apache-2.0 WITH LLVM-exception
   AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT`.
 - [NumPy](https://numpy.org/) converts the generated tensor to PCM samples. Its installed
   package metadata records the expression
   `BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0`.
 
-Their exact versions and transitive dependency graph are recorded in `uv.lock`. The
-installed wheels retain every file named by their `License-File` metadata.
+[TorchAudio](https://pytorch.org/audio/) supports the Qwen audio stack. Exact versions
+and the complete transitive dependency graph are recorded in `uv.lock`. Installed
+wheels retain the license files declared in their package metadata.
 
 ## Container runtime components
 
 The production image is based on the official Python image and includes Debian's FFmpeg
-and CA-certificate packages. Python is distributed under the Python Software Foundation
-License. FFmpeg and its linked libraries are covered by the licenses reported by the
-specific Debian packages in the image. Corresponding package copyright notices remain
-available under `/usr/share/doc` inside the image.
+and CA-certificate packages, plus SoX for the Qwen audio stack. Python is distributed
+under the Python Software Foundation License. FFmpeg, SoX, and their linked libraries are
+covered by the licenses reported by the specific Debian packages in the image.
+Corresponding package copyright notices remain available under `/usr/share/doc` inside
+the image.
 
 ## Other Python dependencies
 

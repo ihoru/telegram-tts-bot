@@ -16,14 +16,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
 
+from telegram_tts_bot.speech.chunking import MAX_CHUNK_LENGTH as MAX_CHUNK_LENGTH
+from telegram_tts_bot.speech.chunking import chunk_text
 from telegram_tts_bot.speech.errors import SynthesisError
 from telegram_tts_bot.speech.types import WavAudio
 
 MODEL_SHA256 = "50081637b602126ee06cb3bc8a744d25651d2da149ee8864b9a379bfdd934437"
 SAMPLE_RATE = 48_000
-MAX_CHUNK_LENGTH = 500
+_chunk_text = chunk_text
 _WARMUP_TEXT = "Короткая проверка готовности модели к синтезу."
-_CHUNK_BOUNDARIES = frozenset(".!?;:,…")
 _LATIN_TO_CYRILLIC = {
     "a": "а",
     "b": "б",
@@ -219,27 +220,6 @@ def verify_model(model_path: Path) -> None:
     """Verify the pinned model before deserializing executable package data."""
     if sha256_file(model_path) != MODEL_SHA256:
         raise SynthesisError("Silero model checksum mismatch")
-
-
-def _chunk_text(text: str) -> list[str]:
-    """Split losslessly at natural boundaries within the model's safe limit."""
-    chunks: list[str] = []
-    offset = 0
-    while len(text) - offset > MAX_CHUNK_LENGTH:
-        window = text[offset : offset + MAX_CHUNK_LENGTH]
-        boundary = max(
-            (
-                index + 1
-                for index, character in enumerate(window)
-                if character.isspace() or character in _CHUNK_BOUNDARIES
-            ),
-            default=MAX_CHUNK_LENGTH,
-        )
-        chunks.append(text[offset : offset + boundary])
-        offset += boundary
-    if offset < len(text):
-        chunks.append(text[offset:])
-    return chunks
 
 
 def _contains_cyrillic_letter(text: str) -> bool:

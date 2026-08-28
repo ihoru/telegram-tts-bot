@@ -27,7 +27,7 @@ FROM build AS test
 COPY docker/debian.sources /etc/apt/sources.list.d/debian.sources
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
-        ca-certificates ffmpeg time \
+        ca-certificates ffmpeg sox time \
     && rm -rf /var/lib/apt/lists/*
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --all-groups --no-editable
@@ -46,14 +46,14 @@ ARG VCS_REF=unknown
 
 LABEL org.opencontainers.image.title="Vslukh" \
       org.opencontainers.image.description="Local-first Telegram text-to-speech bot" \
-      org.opencontainers.image.licenses="GPL-3.0-or-later AND CC-BY-NC-SA-4.0" \
+      org.opencontainers.image.licenses="GPL-3.0-or-later AND CC-BY-NC-SA-4.0 AND Apache-2.0" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}"
 
 COPY docker/debian.sources /etc/apt/sources.list.d/debian.sources
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
-        ca-certificates ffmpeg \
+        ca-certificates ffmpeg sox \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid "${APP_UID}" vslukh \
     && useradd --uid "${APP_UID}" --gid "${APP_UID}" --no-create-home \
@@ -63,13 +63,20 @@ WORKDIR /app
 COPY --from=build --chown=${APP_UID}:${APP_UID} /app/.venv /app/.venv
 COPY --from=voice --chown=${APP_UID}:${APP_UID} /voice/v5_5_ru.pt /opt/silero/
 COPY LICENSE THIRD_PARTY_NOTICES.md licenses/silero-models-CC-BY-NC-SA-4.0.txt \
+    licenses/qwen3-tts-Apache-2.0.txt \
     /usr/share/doc/vslukh/
 
 ENV HOME=/nonexistent \
     PATH=/app/.venv/bin:$PATH \
+    QWEN_MODEL_PATH=/models/qwen3-tts-12hz-0.6b-customvoice \
     SILERO_MODEL_PATH=/opt/silero/v5_5_ru.pt \
-    TTS_VOICE=kseniya \
-    TTS_MAX_CONCURRENCY=2 \
+    TTS_VOICE=aiden \
+    TTS_MAX_CONCURRENCY=1 \
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 \
+    HF_HUB_DISABLE_TELEMETRY=1 \
+    DO_NOT_TRACK=1 \
+    ORT_DISABLE_TELEMETRY=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 

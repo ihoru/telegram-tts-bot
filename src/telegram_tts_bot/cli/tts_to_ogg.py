@@ -2,19 +2,24 @@
 
 import argparse
 import asyncio
+import logging
 import os
 import sys
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 
 from telegram_tts_bot.config import (
+    DEFAULT_QWEN_MODEL_PATH,
     DEFAULT_SILERO_MODEL_PATH,
     DEFAULT_TTS_VOICE,
     ConfigurationError,
     validate_tts_voice,
 )
 from telegram_tts_bot.speech import VoiceRenderError, create_voice_renderer
+
+_QWEN_LOGGER_NAME = "telegram_tts_bot.speech.qwen"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -48,12 +53,15 @@ def _validate_destination(path: Path, *, force: bool) -> Path:
     return resolved
 
 
-def _speech_settings() -> tuple[Path, str]:
-    model_path = Path(
+def _speech_settings() -> tuple[Path, Path, str]:
+    qwen_model_path = Path(
+        os.environ.get("QWEN_MODEL_PATH", str(DEFAULT_QWEN_MODEL_PATH))
+    ).expanduser()
+    silero_model_path = Path(
         os.environ.get("SILERO_MODEL_PATH", str(DEFAULT_SILERO_MODEL_PATH))
     ).expanduser()
-    speaker = validate_tts_voice(os.environ.get("TTS_VOICE", DEFAULT_TTS_VOICE))
-    return model_path.resolve(), speaker
+    voice = validate_tts_voice(os.environ.get("TTS_VOICE", DEFAULT_TTS_VOICE))
+    return qwen_model_path.resolve(), silero_model_path.resolve(), voice
 
 
 def _write_output(path: Path, data: bytes, *, force: bool) -> None:
@@ -82,11 +90,30 @@ def _write_output(path: Path, data: bytes, *, force: bool) -> None:
             temporary_path.unlink(missing_ok=True)
 
 
+@contextmanager
+def _qwen_progress_to_stderr() -> Iterator[None]:
+    logger = logging.getLogger(_QWEN_LOGGER_NAME)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("tts-to-ogg: %(message)s"))
+    previous_level = logger.level
+    previous_propagate = logger.propagate
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    try:
+        yield
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(previous_level)
+        logger.propagate = previous_propagate
+
+
 async def _render(text: str) -> bytes:
-    model_path, speaker = _speech_settings()
+    qwen_model_path, silero_model_path, voice = _speech_settings()
     renderer = create_voice_renderer(
-        model_path=model_path,
-        speaker=speaker,
+        qwen_model_path=qwen_model_path,
+        silero_model_path=silero_model_path,
+        voice=voice,
         max_workers=1,
     )
     try:
@@ -108,7 +135,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     try:
-        data = asyncio.run(_render(text))
+        with _qwen_progress_to_stderr():
+            data = asyncio.run(_render(text))
         _write_output(destination, data, force=args.force)
     except KeyboardInterrupt:
         return 130

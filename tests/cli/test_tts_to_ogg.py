@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import io
+import logging
 import os
 import sys
 from collections.abc import Coroutine
@@ -39,6 +40,7 @@ def test_cli_writes_resolved_output_without_telegram_token(
         return b"ogg"
 
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.setenv("QWEN_MODEL_PATH", str(tmp_path / "qwen"))
     monkeypatch.setattr(tts_to_ogg, "_read_stdin", lambda: "a" * 5000)
     monkeypatch.setattr(tts_to_ogg, "_render", render)
     output = tmp_path / "sample.ogg"
@@ -46,6 +48,28 @@ def test_cli_writes_resolved_output_without_telegram_token(
     assert tts_to_ogg.main([str(output)]) == 0
     assert output.read_bytes() == b"ogg"
     assert capsys.readouterr().out.strip() == str(output.resolve())
+
+
+def test_cli_forwards_only_qwen_progress_to_stderr(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    async def render(_text: str) -> bytes:
+        await asyncio.sleep(0)
+        logging.getLogger("telegram_tts_bot.speech.qwen").info("generating Qwen chunk 1/3")
+        logging.getLogger("unrelated").warning("unrelated warning")
+        return b"ogg"
+
+    monkeypatch.setattr(tts_to_ogg, "_read_stdin", lambda: "private text")
+    monkeypatch.setattr(tts_to_ogg, "_render", render)
+    output = tmp_path / "sample.ogg"
+
+    assert tts_to_ogg.main([str(output)]) == 0
+    captured = capsys.readouterr()
+    assert captured.out.strip() == str(output.resolve())
+    assert captured.err.strip() == "tts-to-ogg: generating Qwen chunk 1/3"
+    assert "private text" not in captured.err
 
 
 def test_cli_validates_path_before_rendering(
@@ -107,6 +131,7 @@ def test_cli_wires_silero_environment_without_telegram_token(
         return Renderer()
 
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.setenv("QWEN_MODEL_PATH", str(tmp_path / "qwen"))
     monkeypatch.setenv("SILERO_MODEL_PATH", str(tmp_path / "model.pt"))
     monkeypatch.setenv("TTS_VOICE", "xenia")
     monkeypatch.setattr(tts_to_ogg, "create_voice_renderer", renderer_factory)
@@ -114,8 +139,9 @@ def test_cli_wires_silero_environment_without_telegram_token(
     assert asyncio.run(tts_to_ogg._render("private text")) == b"ogg"
     assert calls == [
         {
-            "model_path": (tmp_path / "model.pt").resolve(),
-            "speaker": "xenia",
+            "qwen_model_path": (tmp_path / "qwen").resolve(),
+            "silero_model_path": (tmp_path / "model.pt").resolve(),
+            "voice": "xenia",
             "max_workers": 1,
         },
         "private text",
@@ -134,7 +160,7 @@ def test_cli_rejects_unsupported_voice_after_input_validation(
 
     assert tts_to_ogg.main([str(output)]) == 2
     assert not output.exists()
-    assert "kseniya, xenia, baya" in capsys.readouterr().err
+    assert "aiden, serena, kseniya, xenia, baya" in capsys.readouterr().err
 
 
 def test_cli_refuses_overwrite_and_force_replaces_atomically(

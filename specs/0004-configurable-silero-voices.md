@@ -1,10 +1,11 @@
 ---
 id: "0004"
 title: Configurable Silero voices
-status: accepted
+status: superseded
 created: 2026-08-28
 updated: 2026-08-28
 supersedes: "0002"
+superseded_by: "0005"
 ---
 
 # SPEC-0004: Configurable Silero voices
@@ -209,6 +210,14 @@ There is no data migration or persistent user state.
   request; immutable configuration is sufficient.
 - Loading a model per worker multiplies memory beyond the deployment target; one shared
   model remains the required architecture.
+
+## Implementation record
+
+Implemented by `6cc06a5`. Verification completed with locked Ruff lint and format
+checks, strict mypy, 117 passing tests with four opt-in tests skipped, real synthesis
+for all three configured speakers, and a real 4,096-character chunked render. SPEC-0005
+later superseded the single-provider/default-speaker decision while retaining Silero as
+an available local provider.
 
 ## Open questions
 

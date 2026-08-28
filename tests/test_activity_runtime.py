@@ -98,9 +98,10 @@ async def test_run_bot_preserves_updates_and_closes_resources_in_order(
 
     def renderer_factory(**kwargs: object) -> VoiceRenderer:
         assert kwargs == {
-            "model_path": settings.silero_model_path,
-            "speaker": "xenia",
-            "max_workers": 2,
+            "qwen_model_path": settings.qwen_model_path,
+            "silero_model_path": settings.silero_model_path,
+            "voice": "xenia",
+            "max_workers": 1,
         }
         return cast(VoiceRenderer, renderer)
 

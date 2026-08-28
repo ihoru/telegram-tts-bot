@@ -9,8 +9,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DEFAULT_SILERO_MODEL_PATH = Path(".models/silero/v5_5_ru.pt")
-DEFAULT_TTS_VOICE = "kseniya"
-SUPPORTED_TTS_VOICES = ("kseniya", "xenia", "baya")
+DEFAULT_QWEN_MODEL_PATH = Path(".models/qwen3-tts-12hz-0.6b-customvoice")
+DEFAULT_TTS_VOICE = "aiden"
+QWEN_TTS_VOICES = ("aiden", "serena")
+SUPPORTED_TTS_VOICES = (*QWEN_TTS_VOICES, "kseniya", "xenia", "baya")
 
 
 class ConfigurationError(ValueError):
@@ -22,9 +24,10 @@ class BotSettings:
     """Validated settings that cannot change after startup."""
 
     telegram_bot_token: str
+    qwen_model_path: Path = DEFAULT_QWEN_MODEL_PATH
     silero_model_path: Path = DEFAULT_SILERO_MODEL_PATH
     tts_voice: str = DEFAULT_TTS_VOICE
-    max_concurrency: int = 2
+    max_concurrency: int = 1
     max_concurrency_per_user: int = 1
     log_level: int = logging.INFO
 
@@ -35,8 +38,11 @@ class BotSettings:
         token = values.get("TELEGRAM_BOT_TOKEN", "")
         _validate_token(token)
 
-        max_concurrency = _positive_integer(values, "TTS_MAX_CONCURRENCY", default=2)
+        voice = validate_tts_voice(values.get("TTS_VOICE", DEFAULT_TTS_VOICE))
+        max_concurrency = _positive_integer(values, "TTS_MAX_CONCURRENCY", default=1)
         per_user = _positive_integer(values, "TTS_MAX_CONCURRENCY_PER_USER", default=1)
+        if voice in QWEN_TTS_VOICES and max_concurrency != 1:
+            raise ConfigurationError("TTS_MAX_CONCURRENCY must be 1 when TTS_VOICE uses Qwen")
         if per_user > max_concurrency:
             raise ConfigurationError(
                 "TTS_MAX_CONCURRENCY_PER_USER must not exceed TTS_MAX_CONCURRENCY"
@@ -44,10 +50,13 @@ class BotSettings:
 
         return cls(
             telegram_bot_token=token,
+            qwen_model_path=Path(
+                values.get("QWEN_MODEL_PATH", str(DEFAULT_QWEN_MODEL_PATH))
+            ).expanduser(),
             silero_model_path=Path(
                 values.get("SILERO_MODEL_PATH", str(DEFAULT_SILERO_MODEL_PATH))
             ).expanduser(),
-            tts_voice=validate_tts_voice(values.get("TTS_VOICE", DEFAULT_TTS_VOICE)),
+            tts_voice=voice,
             max_concurrency=max_concurrency,
             max_concurrency_per_user=per_user,
             log_level=_logging_level(values.get("LOG_LEVEL", "INFO")),

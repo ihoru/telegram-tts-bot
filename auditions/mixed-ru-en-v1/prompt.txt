@@ -1,0 +1,1 @@
+Сегодня мы обсуждали новую deployment strategy. Потом проверили API rate limits. В конце поговорили про user experience. The release is scheduled for Friday.

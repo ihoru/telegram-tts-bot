@@ -37,12 +37,16 @@ personal, alpha-stage project.
 - Vslukh stores no Telegram messages or rendered audio. It keeps data in process memory
   only for rendering and upload. The CLI writes only the explicitly requested output.
 - Logs omit message text, names, usernames, forwarding metadata, and token values.
+- The Qwen adapter accepts exactly eleven pinned snapshot files and verifies every
+  SHA-256 before importing the inference package. It uses local-only loading with Hugging
+  Face and Transformers offline modes; the model uses safetensors rather than pickle.
 - The Silero PyTorch package contains executable model code. Only the documented
   `v5_5_ru.pt` SHA-256 is accepted before deserialization, and runtime model downloads
-  are disabled. Treat model-path overrides as trusted deployment inputs.
+  are disabled. Treat both model-path overrides as trusted deployment inputs.
 - Release actions and container bases are pinned to immutable digests; tagged releases
   carry SBOM and provenance attestations.
-- The runtime image uses an unprivileged user and needs no writable volume.
+- The runtime image uses an unprivileged user. Qwen deployments mount only the verified
+  model directory read-only; neither provider needs a writable volume.
 
 The bot is intentionally public. Disabling group joining and keeping group privacy on do
 not authorize private-chat users. Anyone who discovers the username can use it. Do not
@@ -58,8 +62,9 @@ or create end-to-end confidentiality.
 - Keep the host, Docker engine, base image, uv lock, and Dependabot updates current.
 - Give the container only outbound network access needed for Telegram; it does not need
   inbound ports.
-- Do not mount the Docker socket, source repository, model directory, or host secrets into
-  the runtime container.
-- Keep the default concurrency of two on a two-CPU, 1 GiB host unless a constrained
-  stress test proves a different setting safe.
+- Do not mount the Docker socket, source repository, or host secrets into the runtime
+  container. Mount only the Qwen model directory, read-only, at its configured path.
+- Keep Qwen concurrency at exactly one. The supported baseline is one BF16-capable
+  NVIDIA GPU with 8 GiB VRAM and at least 8 GiB host RAM. A Silero-only deployment may
+  use the separately measured default of two on a two-CPU, 1 GiB host.
 - Roll back by redeploying a previously trusted immutable image digest.

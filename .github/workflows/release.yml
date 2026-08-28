@@ -48,10 +48,10 @@ jobs:
         run: uv build
 
   stress:
-    name: Constrained two-render stress test
+    name: Constrained Silero two-render stress test
     needs: quality
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -73,7 +73,7 @@ jobs:
           docker run --rm vslukh:test
           /app/.venv/bin/pytest --no-cov
           -m "integration and not stress" -s
-      - name: Run two shared-model renders under host limits
+      - name: Run two shared Silero renders under host limits
         run: |
           # Collect only the stress node so the 1 GiB measurement covers the production
           # render pipeline instead of importing the entire pytest suite.
@@ -132,7 +132,7 @@ jobs:
           images: ${{ steps.release.outputs.image }}
           flavor: latest=false
           labels: |
-            org.opencontainers.image.licenses=GPL-3.0-or-later AND CC-BY-NC-SA-4.0
+            org.opencontainers.image.licenses=GPL-3.0-or-later AND CC-BY-NC-SA-4.0 AND Apache-2.0
           tags: |
             type=semver,pattern={{version}}
             type=sha,format=long,prefix=

@@ -30,8 +30,9 @@ class MessageKey(StrEnum):
 _RU_MESSAGES: Final = MappingProxyType({
     MessageKey.START: (
         'Привет! Я "Вслух".\n\n'
-        "Я превращаю обычные и пересланные текстовые сообщения в голосовые заметки "
-        "на русском языке.\n\n"
+        "Я превращаю обычные и пересланные текстовые сообщения в голосовые заметки. "
+        "В зависимости от настроенного голоса бот также может естественно читать "  # noqa: RUF001
+        "английские слова и фразы.\n\n"
         "Отправьте мне текст или перешлите текстовое сообщение — я отвечу готовой "
         "голосовой заметкой.\n\n"
         "Озвучивание выполняется локально. Я не сохраняю сообщения и созданное аудио.\n\n"
@@ -42,7 +43,8 @@ _RU_MESSAGES: Final = MappingProxyType({
         "• Отправьте обычное текстовое сообщение.\n"
         "• Или перешлите текстовое сообщение из другого чата.\n"
         "• Получите голосовую заметку в ответ.\n\n"
-        "Бот работает только в личном чате и сейчас озвучивает русский текст. "
+        "Бот работает только в личном чате. Лучше всего он работает с русским текстом; "  # noqa: RUF001
+        "качество английских слов и фраз зависит от настроенного голоса. "
         "Озвучивается только текст сообщения, без имени автора и данных пересылки. "
         "Сообщения и готовое аудио не сохраняются. Если бот занят, попробуйте снова "
         "позже.\n\n"
@@ -66,7 +68,9 @@ _RU_MESSAGES: Final = MappingProxyType({
 _EN_MESSAGES: Final = MappingProxyType({
     MessageKey.START: (
         "Hello! I am Vslukh.\n\n"
-        "I turn regular and forwarded text messages into Russian voice notes.\n\n"
+        "I turn regular and forwarded text messages into voice notes. Depending on "
+        "the configured voice, the bot can also read English words and phrases "
+        "naturally.\n\n"
         "Send me text or forward a text message, and I will reply with a ready-to-play "
         "voice note.\n\n"
         "Speech is generated locally. I do not store messages or generated audio.\n\n"
@@ -77,7 +81,8 @@ _EN_MESSAGES: Final = MappingProxyType({
         "• Send a regular text message.\n"
         "• Or forward a text message from another chat.\n"
         "• Receive a voice note in reply.\n\n"
-        "The bot works only in private chats and currently speaks Russian. "
+        "The bot works only in private chats. It is strongest in Russian; the quality "
+        "of English words and phrases depends on the configured voice. "
         "It reads only the message text, not the author name or forwarding details. "
         "Messages and generated audio are not stored. If the bot is busy, try again "
         "later.\n\n"

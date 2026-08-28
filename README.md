@@ -4,25 +4,27 @@
   <img src="assets/vslukh-avatar.png" alt="Vslukh logo" width="180">
 </p>
 
-Vslukh is a small, local-first Telegram bot that turns regular and forwarded text
-messages into Russian voice notes. Speech is generated on the host with Silero and
-returned as an OGG/Opus Telegram voice note; the bot keeps no message or audio history.
+Vslukh is a small, local-first Telegram bot that turns regular and forwarded text into
+voice notes. Speech is generated on the host with Qwen3-TTS or Silero and returned as an
+OGG/Opus Telegram voice note; the bot keeps no message or audio history.
 
 The repository is deliberately narrow and operationally complete: Python 3.14, uv,
 Ruff, strict mypy, pytest with branch coverage, pre-commit, a non-root container, and
 SHA-pinned GitHub Actions. The accepted behavior is defined by
-[SPEC-0004](specs/0004-configurable-silero-voices.md).
+[SPEC-0005](specs/0005-local-qwen-aiden.md).
 
 ## What it does
 
-- Speaks ordinary and forwarded private text messages with an operator-selected
-  `kseniya`, `xenia`, or `baya` voice from one bundled Russian model.
+- Speaks ordinary and forwarded private text messages with startup-selected `aiden`,
+  `serena`, `kseniya`, `xenia`, or `baya`.
+- Uses Qwen Aiden by default for mixed Russian-English text; Serena uses the same local
+  model, while the three Silero voices remain lightweight Russian-first alternatives.
 - Replies with mono, 48 kHz OGG/Opus audio suitable for Telegram voice-note playback.
 - Provides `tts-to-ogg` for testing the exact rendering path without Telegram.
 - Runs speech generation locally and never writes Telegram messages or generated audio
   to persistent storage.
-- Rejects overload immediately: two render pipelines globally and one per user by
-  default, with no hidden queue.
+- Rejects overload immediately: one render pipeline globally and per user by default,
+  with no hidden queue.
 
 Vslukh is an ordinary public BotFather bot. Disabling groups does not make direct
 messages private or friends-only; anyone who discovers its username can send it text.
@@ -35,12 +37,16 @@ Local development is supported on Linux x86-64 and requires:
 - [Python 3.14](https://www.python.org/) on Linux x86-64 with AVX2
 - [uv](https://docs.astral.sh/uv/)
 - [FFmpeg](https://ffmpeg.org/) with the Opus encoder
+- [SoX](https://sourceforge.net/projects/sox/) for the Qwen audio stack
 - a bot token created with [BotFather](https://t.me/BotFather), for Telegram operation
   only
 
-The production container includes Python, FFmpeg, application dependencies, and the
-verified voice model. Docker operation requires an amd64 Linux host or compatible
-emulation.
+Qwen requires an NVIDIA GPU with BF16 support. The verified baseline is 8 GiB VRAM,
+at least 8 GiB host RAM, and one concurrent render. Silero can run on CPU; its measured
+two-render baseline remains two CPUs and 1 GiB RAM. The production image is amd64 and
+contains the CUDA runtime and Silero model, but Qwen's roughly 2.5 GB snapshot is mounted
+separately rather than baked into the image. The validated runtime image is about 6.22 GB
+uncompressed. GPU containers also require the NVIDIA Container Toolkit on the host.
 
 ## Quick start
 
@@ -52,14 +58,25 @@ uv sync --locked --all-groups
 uv run pre-commit install
 ```
 
-Provision the pinned `v5_5_ru` model into the ignored local model directory:
+Provision the exact pinned Qwen snapshot into the ignored local model directory. This
+downloads roughly 2.5 GB once, shows per-file progress with KiB/MiB/GiB units on stderr,
+and verifies every file before installing it:
+
+```bash
+uv run python -m telegram_tts_bot.speech.qwen_model
+```
+
+Press Ctrl+C once to cancel provisioning. The command closes the active download,
+removes partial staging data, prints a concise cancellation message, and exits 130.
+
+For a CPU-only Silero configuration, provision its pinned `v5_5_ru` model instead:
 
 ```bash
 uv run python -m telegram_tts_bot.speech.model --output-dir .models/silero
 ```
 
-Install FFmpeg with your operating-system package manager, then verify the renderer
-without a Telegram token:
+Install FFmpeg and SoX with your operating-system package manager, then verify the
+default Qwen renderer on a CUDA host without a Telegram token:
 
 ```bash
 printf '%s' 'Привет! Это Вслух.' | uv run tts-to-ogg sample.ogg
@@ -100,41 +117,36 @@ and verification checklist are maintained in
 
 ## Configuration
 
-| Variable | Required | Default             | Meaning |
-| --- | --- |---------------------| --- |
-| `TELEGRAM_BOT_TOKEN` | Bot only | -                   | Secret token issued by BotFather. |
-| `SILERO_MODEL_PATH` | No | Local or baked model | Path to the verified `v5_5_ru.pt`. |
-| `TTS_VOICE` | No | `kseniya` p         | One of `kseniya`, `xenia`, or `baya`. |
-| `TTS_MAX_CONCURRENCY` | No | `2`                 | Maximum active render pipelines process-wide. |
-| `TTS_MAX_CONCURRENCY_PER_USER` | No | `1`                 | Maximum active pipelines for one Telegram user. |
-| `LOG_LEVEL` | No | `INFO`              | Standard Python logging level. |
+| Variable | Required | Default | Meaning |
+| --- | --- | --- | --- |
+| `TELEGRAM_BOT_TOKEN` | Bot only | - | Secret token issued by BotFather. |
+| `QWEN_MODEL_PATH` | For Qwen | Local or mounted model | Path to the verified Qwen snapshot directory. |
+| `SILERO_MODEL_PATH` | For Silero | Local or baked model | Path to the verified `v5_5_ru.pt`. |
+| `TTS_VOICE` | No | `aiden` | One of `aiden`, `serena`, `kseniya`, `xenia`, or `baya`. |
+| `TTS_MAX_CONCURRENCY` | No | `1` | Maximum active render pipelines process-wide. Qwen requires exactly `1`. |
+| `TTS_MAX_CONCURRENCY_PER_USER` | No | `1` | Maximum active pipelines for one Telegram user. |
+| `LOG_LEVEL` | No | `INFO` | Standard Python logging level. |
 
 Both capacity values must be positive integers, and the per-user value cannot exceed the
 global value. Configuration is validated once at startup and remains immutable.
 
-The audition labels map to configuration as follows:
-
-| Audition sample | `TTS_VOICE` |
-| --- | --- |
-| A | `kseniya` |
-| B | `xenia` |
-| F | `baya` |
-
-All three speakers are included in the same model. Set one value in `.env` or the
-process environment and restart the bot to change the process-wide voice:
+Set one value in `.env` or the process environment and restart the bot to change the
+process-wide voice:
 
 ```bash
-TTS_VOICE=xenia
+TTS_VOICE=serena
 ```
 
-The model is Russian-first. Cyrillic text and ordinary punctuation are retained; Latin
-letters are deterministically transliterated, digits are read individually, and
-symbol-only input speaks sign names. This compatibility behavior is phonetic rather than
-language-aware translation.
+Qwen Aiden and Serena receive the original text with automatic language selection and
+are intended for mixed Russian-English messages. The shared snapshot is loaded once on
+`cuda:0`; inference is serialized. Silero is Russian-first: Cyrillic and punctuation are
+retained, while Latin letters are deterministically transliterated and digits are read
+individually.
 
-The bundled model is CC BY-NC-SA 4.0 and is limited to non-commercial use. A commercial
-deployment requires separate permission from Silero; see
-[Third-party notices](THIRD_PARTY_NOTICES.md).
+The exact mixed-language prompt and all 11 historical Piper, Silero, and Qwen audition
+WAVs are in [the chronological audition archive](auditions/README.md). Qwen code and
+weights are Apache-2.0. The bundled Silero model is CC BY-NC-SA 4.0 and limited to
+NonCommercial use; see [Third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## TTS command
 
@@ -152,7 +164,24 @@ The command:
 - refuses to overwrite a file unless `--force` is supplied;
 - requires the destination parent directory to exist;
 - renders fully before touching the destination and replaces atomically with `--force`;
-- prints only the resolved output path on success and never logs the supplied text.
+- prints model-load and per-chunk Qwen progress on stderr without logging supplied text;
+- prints only the resolved output path on stdout after success.
+
+Qwen processes long input sequentially in chunks of at most 500 Unicode characters.
+For example, 1,304 characters require three model generations and can take several
+minutes without FlashAttention; the stderr chunk counter distinguishes this from a
+stalled process. The upstream messages about missing FlashAttention, missing SoX, and
+setting `pad_token_id` are warnings rather than a 1,000-character rejection. Install
+SoX for the supported local stack; FlashAttention remains an optional acceleration.
+
+The official API also supports batching. On the reference RTX 2000 Ada 8 GiB GPU, the
+same three chunks took 100.47 seconds sequentially and 43.95 seconds as one batch, while
+reserved VRAM rose from 3.45 GiB to 5.12 GiB. Batching changed the seeded waveforms and
+reduced their combined duration from 110.56 to 93.84 seconds, so the production adapter
+keeps the quality-accepted sequential behavior until the batched output is auditioned.
+The current runtime already selects PyTorch SDPA. Official FlashAttention 2 or a faster
+GPU are the remaining ways to reduce latency without changing the chunk contract;
+FlashAttention requires a compatible CUDA build environment and is not bundled.
 
 Exit status is `0` for success, `2` for usage/input/path errors, `1` for model, FFmpeg,
 synthesis, or write failures, and `130` for interruption.
@@ -166,18 +195,19 @@ flowchart LR
     gate --> renderer[VoiceRenderer]
     stdin[stdin CLI] --> renderer
     renderer --> synth[WaveSynthesizer]
-    synth --> silero[Silero adapter]
+    synth --> provider{configured voice}
+    provider --> qwen[Qwen adapter]
+    provider --> silero[Silero adapter]
     renderer --> opus[FFmpeg OGG/Opus encoder]
     opus --> voice[voice-note bytes]
     voice --> telegram_api[Telegram sendVoice]
     voice --> file[explicit CLI file]
 ```
 
-Telegram handlers and the CLI depend on `VoiceRenderer`, not Silero or FFmpeg. Silero is
-the sole production `WaveSynthesizer`; replacing the engine means adding one adapter and
-changing composition, not editing message handlers. The bot loads one model and one
-configured speaker per process and runs blocking synthesis and encoding in a dedicated
-executor.
+Telegram handlers and the CLI depend on `VoiceRenderer`, not Qwen, Silero, or FFmpeg.
+The composition root selects one `WaveSynthesizer` from `TTS_VOICE`. The bot loads one
+model and configured speaker per process and runs blocking synthesis and encoding in a
+dedicated executor.
 
 No runtime component downloads a model, opens a database, creates a cache, or stores
 input. Telegram still necessarily receives messages and returned voice notes as part of
@@ -192,21 +222,26 @@ Build the final amd64 image:
 docker build --platform linux/amd64 --target runtime -t vslukh:local .
 ```
 
-Run it with the ignored environment file:
+Run the default Qwen voice with the ignored environment file, a read-only verified model
+mount, and one NVIDIA GPU:
 
 ```bash
-docker run --rm --init --env-file .env vslukh:local
+docker run --rm --init --gpus device=0 --env-file .env \
+  --mount type=bind,source=/absolute/path/to/.models/qwen3-tts-12hz-0.6b-customvoice,target=/models/qwen3-tts-12hz-0.6b-customvoice,readonly \
+  vslukh:local
 ```
 
-The image runs as an unprivileged user, contains the model at `/opt/silero/v5_5_ru.pt`,
-and needs no volume. Stop the container with `SIGTERM`; the bot stops intake and drains
-active worker jobs before exiting. Exactly one polling replica may use a token at a
-time.
+The image runs as an unprivileged user, verifies the mounted Qwen snapshot before load,
+and contains the Silero fallback at `/opt/silero/v5_5_ru.pt`. A CPU-only Silero run sets
+`TTS_VOICE=kseniya` and may set `TTS_MAX_CONCURRENCY=2`; it does not need the Qwen mount
+or a GPU. Stop with `SIGTERM`; the bot drains active work before exiting. Exactly one
+polling replica may use a token at a time.
 
 Test the baked renderer without starting Telegram:
 
 ```bash
-container_id=$(docker create --interactive --entrypoint tts-to-ogg vslukh:local /tmp/sample.ogg)
+container_id=$(docker create --interactive --env TTS_VOICE=kseniya \
+  --env TTS_MAX_CONCURRENCY=2 --entrypoint tts-to-ogg vslukh:local /tmp/sample.ogg)
 printf '%s' 'Проверка контейнера' | docker start --attach --interactive "$container_id"
 docker cp "$container_id:/tmp/sample.ogg" ./container-sample.ogg
 docker rm "$container_id"
@@ -237,7 +272,8 @@ models, capacity, privacy, deployment, or BotFather metadata.
 
 Every push and pull request runs independent lint/build, unit-test, and real
 model/container jobs. A semver tag matching the project version, such as `v0.1.0`, also
-runs a two-render test inside a two-CPU, 1 GiB container before publishing.
+runs the retained Silero two-render test inside a two-CPU, 1 GiB container before
+publishing. Qwen's CUDA integration is exercised manually on a GPU host.
 
 Successful tags publish a non-root linux/amd64 image to GHCR with exact semver, commit
 SHA, and `latest` tags, then create a GitHub release containing the Python artifacts and
@@ -257,9 +293,9 @@ ffprobe -version
 
 ### Model verification fails
 
-Delete only the ignored `.models/silero` directory and rerun the explicit provisioning
-helper. Never substitute an unverified file under the accepted model filename. The
-canonical source and SHA-256 value live in SPEC-0004.
+Delete only the affected ignored model directory and rerun its explicit provisioning
+helper. Never substitute an unverified file or add an unlisted file to the Qwen
+snapshot. Canonical sources and hashes live in SPEC-0005.
 
 ### Telegram reports a polling conflict
 
@@ -283,6 +319,6 @@ Vslukh is licensed under
 described in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Please report security
 issues through the private process in [SECURITY.md](SECURITY.md).
 
-The application license does not replace the separately bundled Silero model's
-CC BY-NC-SA 4.0 terms. The model is for non-commercial use unless separate permission
-has been obtained from Silero.
+The application license does not replace third-party terms. Qwen code and weights are
+Apache-2.0. The separately bundled Silero model remains CC BY-NC-SA 4.0 and is for
+NonCommercial use unless separate permission has been obtained from Silero.

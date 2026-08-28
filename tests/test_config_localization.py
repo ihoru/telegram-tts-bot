@@ -13,9 +13,10 @@ def test_settings_use_documented_defaults() -> None:
     settings = BotSettings.from_environment({"TELEGRAM_BOT_TOKEN": VALID_TOKEN})
 
     assert settings.telegram_bot_token == VALID_TOKEN
+    assert settings.qwen_model_path == Path(".models/qwen3-tts-12hz-0.6b-customvoice")
     assert settings.silero_model_path == Path(".models/silero/v5_5_ru.pt")
-    assert settings.tts_voice == "kseniya"
-    assert settings.max_concurrency == 2
+    assert settings.tts_voice == "aiden"
+    assert settings.max_concurrency == 1
     assert settings.max_concurrency_per_user == 1
     assert settings.log_level == 20
 
@@ -23,6 +24,7 @@ def test_settings_use_documented_defaults() -> None:
 def test_settings_accept_safe_overrides() -> None:
     settings = BotSettings.from_environment({
         "TELEGRAM_BOT_TOKEN": VALID_TOKEN,
+        "QWEN_MODEL_PATH": "~/models/qwen",
         "SILERO_MODEL_PATH": "~/models/voice.pt",
         "TTS_VOICE": "baya",
         "TTS_MAX_CONCURRENCY": "8",
@@ -31,6 +33,7 @@ def test_settings_accept_safe_overrides() -> None:
     })
 
     assert settings.silero_model_path == Path("~/models/voice.pt").expanduser()
+    assert settings.qwen_model_path == Path("~/models/qwen").expanduser()
     assert settings.tts_voice == "baya"
     assert settings.max_concurrency == 8
     assert settings.max_concurrency_per_user == 2
@@ -65,7 +68,15 @@ def test_settings_accept_safe_overrides() -> None:
         ),
         (
             {"TELEGRAM_BOT_TOKEN": VALID_TOKEN, "TTS_VOICE": "denis"},
-            "TTS_VOICE must be one of: kseniya, xenia, baya",
+            "TTS_VOICE must be one of: aiden, serena, kseniya, xenia, baya",
+        ),
+        (
+            {
+                "TELEGRAM_BOT_TOKEN": VALID_TOKEN,
+                "TTS_VOICE": "aiden",
+                "TTS_MAX_CONCURRENCY": "2",
+            },
+            "TTS_MAX_CONCURRENCY must be 1 when TTS_VOICE uses Qwen",
         ),
     ],
 )
@@ -86,11 +97,12 @@ def test_settings_are_immutable() -> None:
         settings.max_concurrency = 10  # type: ignore[misc]
 
 
-@pytest.mark.parametrize("voice", ["kseniya", "xenia", "baya"])
+@pytest.mark.parametrize("voice", ["aiden", "serena", "kseniya", "xenia", "baya"])
 def test_settings_accept_every_supported_voice(voice: str) -> None:
     settings = BotSettings.from_environment({
         "TELEGRAM_BOT_TOKEN": VALID_TOKEN,
         "TTS_VOICE": voice,
+        "TTS_MAX_CONCURRENCY": "1",
     })
 
     assert settings.tts_voice == voice
@@ -109,8 +121,9 @@ def test_english_locale_is_the_fallback(language_code: str | None) -> None:
 def test_start_and_help_copy_match_the_accepted_profile() -> None:
     assert message_text(Locale.RU, MessageKey.START) == (
         'Привет! Я "Вслух".\n\n'
-        "Я превращаю обычные и пересланные текстовые сообщения в голосовые заметки "
-        "на русском языке.\n\n"
+        "Я превращаю обычные и пересланные текстовые сообщения в голосовые заметки. "
+        "В зависимости от настроенного голоса бот также может естественно читать "  # noqa: RUF001
+        "английские слова и фразы.\n\n"
         "Отправьте мне текст или перешлите текстовое сообщение — я отвечу готовой "
         "голосовой заметкой.\n\n"
         "Озвучивание выполняется локально. Я не сохраняю сообщения и созданное аудио.\n\n"
@@ -118,7 +131,9 @@ def test_start_and_help_copy_match_the_accepted_profile() -> None:
     )
     assert message_text(Locale.EN, MessageKey.START) == (
         "Hello! I am Vslukh.\n\n"
-        "I turn regular and forwarded text messages into Russian voice notes.\n\n"
+        "I turn regular and forwarded text messages into voice notes. Depending on "
+        "the configured voice, the bot can also read English words and phrases "
+        "naturally.\n\n"
         "Send me text or forward a text message, and I will reply with a ready-to-play "
         "voice note.\n\n"
         "Speech is generated locally. I do not store messages or generated audio.\n\n"

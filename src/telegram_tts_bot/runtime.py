@@ -87,8 +87,9 @@ async def run_bot(
     primary_error: BaseException | None = None
     try:
         renderer = renderer_factory(
-            model_path=settings.silero_model_path,
-            speaker=settings.tts_voice,
+            qwen_model_path=settings.qwen_model_path,
+            silero_model_path=settings.silero_model_path,
+            voice=settings.tts_voice,
             max_workers=settings.max_concurrency,
         )
         speech_service = BotSpeechService(
