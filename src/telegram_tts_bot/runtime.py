@@ -12,6 +12,7 @@ from aiogram import Bot, Dispatcher
 from telegram_tts_bot.activity import HandlerActivity, HandlerActivityMiddleware
 from telegram_tts_bot.bot_service import BotSpeechService
 from telegram_tts_bot.config import BotSettings, ConfigurationError
+from telegram_tts_bot.environment import load_repository_environment
 from telegram_tts_bot.handlers import create_router
 from telegram_tts_bot.speech import VoiceRenderer, create_voice_renderer
 
@@ -118,6 +119,7 @@ async def run_bot(
 
 def main() -> None:
     """Load configuration and run the application without exposing secret values."""
+    load_repository_environment()
     try:
         settings = BotSettings.from_environment()
     except ConfigurationError as error:

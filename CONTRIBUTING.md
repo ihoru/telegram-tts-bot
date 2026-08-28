@@ -48,6 +48,9 @@ uv run python -m telegram_tts_bot.speech.model --output-dir .models/silero
 
 Long Qwen `tts-to-ogg` renders report content-free model-load and 500-character chunk
 progress on stderr. They remain sequential and may take minutes without FlashAttention.
+For local use, `bin/run_bot` and `bin/tts` enter the repository and select the locked uv
+environment automatically. The Python entrypoints load only the repository-root `.env`
+and never override variables already present in the process.
 
 Never commit `.env`, `.models`, arbitrary generated OGG/WAV files, Telegram updates, or
 logs that contain user data. The only audio exception is immutable, manifest-listed

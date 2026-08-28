@@ -218,3 +218,38 @@ def test_create_dispatcher_exposes_speech_service() -> None:
 
     assert dispatcher.workflow_data["speech_service"] is service
     assert len(dispatcher.sub_routers) == 1
+
+
+def test_main_loads_repository_environment_before_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from telegram_tts_bot import runtime
+
+    events: list[str] = []
+    settings = BotSettings(telegram_bot_token="123:token", tts_voice="xenia")
+
+    async def fake_run_bot(received_settings: BotSettings) -> None:
+        await asyncio.sleep(0)
+        assert received_settings is settings
+        events.append("run")
+
+    def settings_from_environment(_cls: type[BotSettings]) -> BotSettings:
+        events.append("settings")
+        return settings
+
+    monkeypatch.setattr(
+        runtime,
+        "load_repository_environment",
+        lambda: events.append("environment"),
+    )
+    monkeypatch.setattr(
+        BotSettings,
+        "from_environment",
+        classmethod(settings_from_environment),
+    )
+    monkeypatch.setattr(runtime, "configure_logging", lambda _level: events.append("logging"))
+    monkeypatch.setattr(runtime, "run_bot", fake_run_bot)
+
+    runtime.main()
+
+    assert events == ["environment", "settings", "logging", "run"]

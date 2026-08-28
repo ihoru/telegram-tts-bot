@@ -9,6 +9,7 @@ import tempfile
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
+from time import perf_counter
 
 from telegram_tts_bot.config import (
     DEFAULT_QWEN_MODEL_PATH,
@@ -17,6 +18,7 @@ from telegram_tts_bot.config import (
     ConfigurationError,
     validate_tts_voice,
 )
+from telegram_tts_bot.environment import load_repository_environment
 from telegram_tts_bot.speech import VoiceRenderError, create_voice_renderer
 
 _QWEN_LOGGER_NAME = "telegram_tts_bot.speech.qwen"
@@ -27,7 +29,12 @@ def _parser() -> argparse.ArgumentParser:
         prog="tts-to-ogg",
         description="Render UTF-8 text from stdin into an OGG/Opus voice note",
     )
-    parser.add_argument("file", type=Path, metavar="FILE")
+    parser.add_argument("file", type=Path, nargs="?", metavar="FILE")
+    parser.add_argument(
+        "--voice",
+        metavar="VOICE",
+        help="speaker override (default: TTS_VOICE or aiden)",
+    )
     parser.add_argument("--force", action="store_true", help="replace an existing FILE")
     return parser
 
@@ -53,14 +60,14 @@ def _validate_destination(path: Path, *, force: bool) -> Path:
     return resolved
 
 
-def _speech_settings() -> tuple[Path, Path, str]:
+def _speech_settings(voice_override: str | None = None) -> tuple[Path, Path, str]:
     qwen_model_path = Path(
         os.environ.get("QWEN_MODEL_PATH", str(DEFAULT_QWEN_MODEL_PATH))
     ).expanduser()
     silero_model_path = Path(
         os.environ.get("SILERO_MODEL_PATH", str(DEFAULT_SILERO_MODEL_PATH))
     ).expanduser()
-    voice = validate_tts_voice(os.environ.get("TTS_VOICE", DEFAULT_TTS_VOICE))
+    voice = validate_tts_voice(voice_override or os.environ.get("TTS_VOICE", DEFAULT_TTS_VOICE))
     return qwen_model_path.resolve(), silero_model_path.resolve(), voice
 
 
@@ -108,8 +115,8 @@ def _qwen_progress_to_stderr() -> Iterator[None]:
         logger.propagate = previous_propagate
 
 
-async def _render(text: str) -> bytes:
-    qwen_model_path, silero_model_path, voice = _speech_settings()
+async def _render(text: str, voice_override: str | None = None) -> tuple[bytes, float]:
+    qwen_model_path, silero_model_path, voice = _speech_settings(voice_override)
     renderer = create_voice_renderer(
         qwen_model_path=qwen_model_path,
         silero_model_path=silero_model_path,
@@ -117,17 +124,26 @@ async def _render(text: str) -> bytes:
         max_workers=1,
     )
     try:
-        return (await renderer.render(text)).data
+        started_at = perf_counter()
+        data = (await renderer.render(text)).data
+        duration_seconds = perf_counter() - started_at
+        return data, duration_seconds
     finally:
         await renderer.close()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the stdin renderer with stable shell-friendly exit codes."""
+    load_repository_environment()
     args = _parser().parse_args(argv)
+    if args.file is None and args.force:
+        print("tts-to-ogg: --force requires FILE", file=sys.stderr)
+        return 2
     try:
         text = _read_stdin()
-        destination = _validate_destination(args.file, force=args.force)
+        destination = (
+            _validate_destination(args.file, force=args.force) if args.file is not None else None
+        )
     except KeyboardInterrupt:
         return 130
     except (OSError, ValueError) as error:
@@ -136,8 +152,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         with _qwen_progress_to_stderr():
-            data = asyncio.run(_render(text))
-        _write_output(destination, data, force=args.force)
+            data, duration_seconds = asyncio.run(_render(text, args.voice))
+        if destination is None:
+            sys.stdout.buffer.write(data)
+            sys.stdout.buffer.flush()
+        else:
+            _write_output(destination, data, force=args.force)
+            print(destination)
+        print(
+            f"tts-to-ogg: rendered in {duration_seconds:.3f} seconds",
+            file=sys.stderr,
+        )
     except KeyboardInterrupt:
         return 130
     except FileExistsError:
@@ -150,5 +175,4 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"tts-to-ogg: rendering failed ({type(error).__name__})", file=sys.stderr)
         return 1
 
-    print(destination)
     return 0

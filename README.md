@@ -88,7 +88,7 @@ Install FFmpeg and SoX with your operating-system package manager, then verify t
 default Qwen renderer on a CUDA host without a Telegram token:
 
 ```bash
-printf '%s' 'Привет! Это Вслух.' | uv run tts-to-ogg sample.ogg
+printf '%s' 'Привет! Это Вслух.' | ./bin/tts sample.ogg
 ffprobe -v error sample.ogg
 ```
 
@@ -98,14 +98,13 @@ Copy the environment template and set the token in the ignored file:
 cp .env.example .env
 ```
 
-The application reads the process environment; it does not load `.env` automatically.
-For a local shell session:
+The bot and TTS command automatically load this repository's `.env` without replacing
+variables already exported by the shell. The launchers locate the repository from their
+own path, so they remain valid when called from another working directory. From the
+repository root, start the bot with:
 
 ```bash
-set -a
-. ./.env
-set +a
-uv run python -m telegram_tts_bot
+./bin/run_bot
 ```
 
 Do not paste the token into source files, Docker build arguments, command-line flags, CI
@@ -160,24 +159,32 @@ Silero model is CC BY-NC-SA 4.0 and limited to NonCommercial use; see
 
 ## TTS command
 
-`tts-to-ogg FILE [--force]` reads strict UTF-8 text from standard input and writes the
-same OGG/Opus format used by the bot:
+`tts-to-ogg [--voice VOICE] [FILE] [--force]` reads strict UTF-8 text from standard
+input and produces the same OGG/Opus format used by the bot. The repository launcher
+automatically selects the locked environment and repository `.env`:
 
 ```bash
-printf '%s' 'Текст для проверки' | uv run tts-to-ogg output.ogg
+printf '%s' 'Текст для проверки' | ./bin/tts --voice aiden output.ogg
+printf '%s' 'Текст для проверки' | ./bin/tts --voice aiden | paplay
 ```
 
 The command:
 
 - accepts text only through stdin, keeping it out of the process list;
+- selects `--voice` first, then `TTS_VOICE`, then the default `aiden`;
 - rejects empty input but intentionally has no Telegram-length limit;
-- refuses to overwrite a file unless `--force` is supplied;
+- writes complete OGG bytes to stdout when `FILE` is omitted;
+- refuses to overwrite a file unless `--force` is supplied and rejects `--force`
+  without `FILE`;
 - requires the destination parent directory to exist;
 - renders fully before touching the destination and replaces atomically with `--force`;
 - prints model-load and per-chunk Qwen progress on stderr without logging supplied text;
-- prints only the resolved output path on stdout after success.
+- reports synthesis plus encoding time on stderr, excluding model initialization;
+- prints only the resolved output path on stdout after successful file output.
 
 Qwen processes long input sequentially in chunks of at most 500 Unicode characters.
+Before chunking, it replaces Telegram-style em dashes (`—`) with ASCII minus characters
+so the punctuation produces the intended break. Silero text processing is unchanged.
 The CUDA-graph runtime performs a one-time warmup during model loading, then reports each
 chunk on stderr so a long render does not look stalled. On the reference RTX 2000 Ada
 8 GiB GPU, the exact 1,304-character, three-chunk test took 50.79 seconds with 3.40 GiB
@@ -208,6 +215,7 @@ flowchart LR
     opus --> voice[voice-note bytes]
     voice --> telegram_api[Telegram sendVoice]
     voice --> file[explicit CLI file]
+    voice --> stdout[CLI stdout]
 ```
 
 Telegram handlers and the CLI depend on `VoiceRenderer`, not Qwen, Silero, or FFmpeg.

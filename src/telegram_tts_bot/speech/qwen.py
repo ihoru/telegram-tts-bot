@@ -153,7 +153,8 @@ class QwenWaveSynthesizer:
     def synthesize(self, text: str, /) -> WavAudio:
         """Create one complete in-memory mono PCM16 WAV file."""
         try:
-            chunks = [chunk for chunk in chunk_text(text) if chunk.strip()]
+            normalized_text = text.replace("\N{EM DASH}", "-")
+            chunks = [chunk for chunk in chunk_text(normalized_text) if chunk.strip()]
             unit = "chunk" if len(chunks) == 1 else "chunks"
             LOGGER.info("generating Qwen audio: %d %s", len(chunks), unit)
             audio_chunks: list[npt.NDArray[np.float32]] = []

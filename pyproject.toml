@@ -24,6 +24,7 @@ dependencies = [
   "aiogram>=3.31.0,<4",
   "faster-qwen3-tts==0.4.0",
   "numpy==2.4.2",
+  "python-dotenv>=1.2.1,<2",
   "torchaudio==2.11.0",
   "torch==2.13.0",
 ]

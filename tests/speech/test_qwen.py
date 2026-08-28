@@ -217,15 +217,25 @@ def test_synthesize_preserves_mixed_text_and_writes_exact_pcm16_wav(speaker: str
         )
 
 
-def test_long_text_is_losslessly_chunked_and_seeded_once() -> None:
+def test_synthesize_replaces_only_em_dashes_before_generation() -> None:
+    model = FakeModel(np.array([0.0], dtype=np.float32))
+
+    _synthesizer(model).synthesize("слово\N{EM DASH}слово \N{EN DASH} слово \N{MINUS SIGN} слово")
+
+    assert [call["text"] for call in model.calls] == [
+        "слово-слово \N{EN DASH} слово \N{MINUS SIGN} слово"
+    ]
+
+
+def test_long_text_is_normalized_losslessly_chunked_and_seeded_once() -> None:
     model = FakeModel(np.array([0.0], dtype=np.float32))
     synthesizer = _synthesizer(model)
-    text = ("Русский text. " * 100) + "конец"
+    text = ("Русский\N{EM DASH}text. " * 100) + "конец\N{EM DASH}теста"
 
     synthesizer.synthesize(text)
 
     chunks = [cast(str, call["text"]) for call in model.calls]
-    assert "".join(chunks) == text
+    assert "".join(chunks) == text.replace("\N{EM DASH}", "-")
     assert len(chunks) > 1
     assert all(0 < len(chunk) <= 500 for chunk in chunks)
     assert cast(FakeTorch, synthesizer.torch).seeds == [SEED]

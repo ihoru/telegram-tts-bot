@@ -278,11 +278,11 @@ def test_load_validates_speaker_list_and_sanitizes_provider_errors(
 def test_synthesize_preserves_text_and_exact_inference_flags(speaker: str) -> None:
     model = FakeModel(FakeTensor([-2.0, -0.5, 0.0, 0.5, 2.0]))
 
-    audio = _synthesizer(model, speaker).synthesize(" точный текст ")
+    audio = _synthesizer(model, speaker).synthesize(" точный \N{EM DASH} текст ")
 
     assert model.calls == [
         {
-            "text": " точный текст ",
+            "text": " точный \N{EM DASH} текст ",
             "speaker": speaker,
             "sample_rate": 48_000,
             "put_accent": True,

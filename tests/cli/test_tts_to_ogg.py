@@ -34,10 +34,11 @@ def test_cli_writes_resolved_output_without_telegram_token(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    async def render(text: str) -> bytes:
+    async def render(text: str, voice: str | None = None) -> tuple[bytes, float]:
         await asyncio.sleep(0)
         assert text == "a" * 5000
-        return b"ogg"
+        assert voice is None
+        return b"ogg", 1.23456
 
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.setenv("QWEN_MODEL_PATH", str(tmp_path / "qwen"))
@@ -47,7 +48,45 @@ def test_cli_writes_resolved_output_without_telegram_token(
 
     assert tts_to_ogg.main([str(output)]) == 0
     assert output.read_bytes() == b"ogg"
-    assert capsys.readouterr().out.strip() == str(output.resolve())
+    captured = capsys.readouterr()
+    assert captured.out.strip() == str(output.resolve())
+    assert captured.err.strip() == "tts-to-ogg: rendered in 1.235 seconds"
+
+
+def test_cli_writes_binary_ogg_to_stdout_without_a_filename(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    async def render(text: str, voice: str | None = None) -> tuple[bytes, float]:
+        await asyncio.sleep(0)
+        assert text == "play this"
+        assert voice == "serena"
+        return b"OggS-binary-audio", 2.0
+
+    monkeypatch.setenv("TTS_VOICE", "baya")
+    monkeypatch.setattr(tts_to_ogg, "_read_stdin", lambda: "play this")
+    monkeypatch.setattr(tts_to_ogg, "_render", render)
+
+    assert tts_to_ogg.main(["--voice", "serena"]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == "OggS-binary-audio"
+    assert captured.err.strip() == "tts-to-ogg: rendered in 2.000 seconds"
+
+
+def test_cli_rejects_force_without_a_filename_before_reading_stdin(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        tts_to_ogg,
+        "_read_stdin",
+        lambda: (_ for _ in ()).throw(AssertionError("stdin must not be read")),
+    )
+
+    assert tts_to_ogg.main(["--force"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "--force requires FILE" in captured.err
 
 
 def test_cli_forwards_only_qwen_progress_to_stderr(
@@ -55,11 +94,11 @@ def test_cli_forwards_only_qwen_progress_to_stderr(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    async def render(_text: str) -> bytes:
+    async def render(_text: str, _voice: str | None = None) -> tuple[bytes, float]:
         await asyncio.sleep(0)
         logging.getLogger("telegram_tts_bot.speech.qwen").info("generating Qwen chunk 1/3")
         logging.getLogger("unrelated").warning("unrelated warning")
-        return b"ogg"
+        return b"ogg", 3.5
 
     monkeypatch.setattr(tts_to_ogg, "_read_stdin", lambda: "private text")
     monkeypatch.setattr(tts_to_ogg, "_render", render)
@@ -68,7 +107,10 @@ def test_cli_forwards_only_qwen_progress_to_stderr(
     assert tts_to_ogg.main([str(output)]) == 0
     captured = capsys.readouterr()
     assert captured.out.strip() == str(output.resolve())
-    assert captured.err.strip() == "tts-to-ogg: generating Qwen chunk 1/3"
+    assert captured.err.splitlines() == [
+        "tts-to-ogg: generating Qwen chunk 1/3",
+        "tts-to-ogg: rendered in 3.500 seconds",
+    ]
     assert "private text" not in captured.err
 
 
@@ -79,11 +121,12 @@ def test_cli_validates_path_before_rendering(
 ) -> None:
     rendered = False
 
-    async def render(text: str) -> bytes:
+    async def render(text: str, voice: str | None = None) -> tuple[bytes, float]:
         nonlocal rendered
         await asyncio.sleep(0)
+        assert voice is None
         rendered = True
-        return b"ogg"
+        return b"ogg", 1.0
 
     monkeypatch.setattr(tts_to_ogg, "_read_stdin", lambda: "text")
     monkeypatch.setattr(tts_to_ogg, "_render", render)
@@ -130,13 +173,20 @@ def test_cli_wires_silero_environment_without_telegram_token(
         calls.append(kwargs)
         return Renderer()
 
+    clock_values = iter([10.0, 11.25])
+
+    def clock() -> float:
+        calls.append("clock")
+        return next(clock_values)
+
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.setenv("QWEN_MODEL_PATH", str(tmp_path / "qwen"))
     monkeypatch.setenv("SILERO_MODEL_PATH", str(tmp_path / "model.pt"))
     monkeypatch.setenv("TTS_VOICE", "xenia")
     monkeypatch.setattr(tts_to_ogg, "create_voice_renderer", renderer_factory)
+    monkeypatch.setattr(tts_to_ogg, "perf_counter", clock)
 
-    assert asyncio.run(tts_to_ogg._render("private text")) == b"ogg"
+    assert asyncio.run(tts_to_ogg._render("private text")) == (b"ogg", 1.25)
     assert calls == [
         {
             "qwen_model_path": (tmp_path / "qwen").resolve(),
@@ -144,9 +194,37 @@ def test_cli_wires_silero_environment_without_telegram_token(
             "voice": "xenia",
             "max_workers": 1,
         },
+        "clock",
         "private text",
+        "clock",
         "closed",
     ]
+
+
+def test_render_voice_option_overrides_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    selected_voices: list[str] = []
+
+    class Renderer:
+        async def render(self, _text: str) -> object:
+            await asyncio.sleep(0)
+            return SimpleNamespace(data=b"ogg")
+
+        async def close(self) -> None:
+            await asyncio.sleep(0)
+
+    def renderer_factory(**kwargs: object) -> Renderer:
+        selected_voices.append(cast(str, kwargs["voice"]))
+        return Renderer()
+
+    monkeypatch.setenv("TTS_VOICE", "baya")
+    monkeypatch.setenv("QWEN_MODEL_PATH", str(tmp_path / "qwen"))
+    monkeypatch.setattr(tts_to_ogg, "create_voice_renderer", renderer_factory)
+
+    assert asyncio.run(tts_to_ogg._render("text", "serena"))[0] == b"ogg"
+    assert selected_voices == ["serena"]
 
 
 def test_cli_rejects_unsupported_voice_after_input_validation(
@@ -163,13 +241,27 @@ def test_cli_rejects_unsupported_voice_after_input_validation(
     assert "aiden, serena, kseniya, xenia, baya" in capsys.readouterr().err
 
 
+def test_cli_voice_option_rejects_unsupported_value_even_when_environment_is_valid(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("TTS_VOICE", "baya")
+    monkeypatch.setattr(tts_to_ogg, "_read_stdin", lambda: "text")
+    output = tmp_path / "sample.ogg"
+
+    assert tts_to_ogg.main(["--voice", "denis", str(output)]) == 2
+    assert not output.exists()
+    assert "aiden, serena, kseniya, xenia, baya" in capsys.readouterr().err
+
+
 def test_cli_refuses_overwrite_and_force_replaces_atomically(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    async def render(text: str) -> bytes:
+    async def render(text: str, _voice: str | None = None) -> tuple[bytes, float]:
         await asyncio.sleep(0)
-        return b"new"
+        return b"new", 1.0
 
     monkeypatch.setattr(tts_to_ogg, "_read_stdin", lambda: "text")
     monkeypatch.setattr(tts_to_ogg, "_render", render)
@@ -217,9 +309,9 @@ def test_cli_maps_racing_destination_to_overwrite_exit_code(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    async def render(_text: str) -> bytes:
+    async def render(_text: str, _voice: str | None = None) -> tuple[bytes, float]:
         await asyncio.sleep(0)
-        return b"ogg"
+        return b"ogg", 1.0
 
     def racing_write(_path: Path, _data: bytes, *, force: bool) -> None:
         assert not force
@@ -238,7 +330,7 @@ def test_cli_maps_render_failure_without_source_text(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    async def render(text: str) -> bytes:
+    async def render(text: str, _voice: str | None = None) -> tuple[bytes, float]:
         await asyncio.sleep(0)
         raise RuntimeError(text)
 
@@ -265,3 +357,34 @@ def test_cli_interrupt_exit_code(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 
     monkeypatch.setattr(tts_to_ogg, "_read_stdin", interrupt_stdin)
     assert tts_to_ogg.main([str(tmp_path / "sample.ogg")]) == 130
+
+
+def test_cli_loads_repository_environment_before_reading_input(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    events: list[str] = []
+
+    async def render(_text: str, _voice: str | None = None) -> tuple[bytes, float]:
+        await asyncio.sleep(0)
+        return b"OggS", 1.0
+
+    def read_stdin() -> str:
+        events.append("stdin")
+        return "text"
+
+    monkeypatch.setattr(
+        tts_to_ogg,
+        "load_repository_environment",
+        lambda: events.append("environment"),
+    )
+    monkeypatch.setattr(
+        tts_to_ogg,
+        "_read_stdin",
+        read_stdin,
+    )
+    monkeypatch.setattr(tts_to_ogg, "_render", render)
+
+    assert tts_to_ogg.main([]) == 0
+    assert events == ["environment", "stdin"]
+    assert capsys.readouterr().out == "OggS"
