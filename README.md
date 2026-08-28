@@ -5,22 +5,23 @@
 </p>
 
 Vslukh is a small, local-first Telegram bot that turns regular and forwarded text
-messages into Russian voice notes. Speech is generated on the host with Piper and
+messages into Russian voice notes. Speech is generated on the host with Silero and
 returned as an OGG/Opus Telegram voice note; the bot keeps no message or audio history.
 
 The repository is deliberately narrow and operationally complete: Python 3.14, uv,
 Ruff, strict mypy, pytest with branch coverage, pre-commit, a non-root container, and
 SHA-pinned GitHub Actions. The accepted behavior is defined by
-[SPEC-0001](specs/0001-initial-telegram-tts-bot.md).
+[SPEC-0004](specs/0004-configurable-silero-voices.md).
 
 ## What it does
 
-- Speaks ordinary and forwarded private text messages with one bundled Russian voice.
+- Speaks ordinary and forwarded private text messages with an operator-selected
+  `kseniya`, `xenia`, or `baya` voice from one bundled Russian model.
 - Replies with mono, 48 kHz OGG/Opus audio suitable for Telegram voice-note playback.
 - Provides `tts-to-ogg` for testing the exact rendering path without Telegram.
 - Runs speech generation locally and never writes Telegram messages or generated audio
   to persistent storage.
-- Rejects overload immediately: five render pipelines globally and one per user by
+- Rejects overload immediately: two render pipelines globally and one per user by
   default, with no hidden queue.
 
 Vslukh is an ordinary public BotFather bot. Disabling groups does not make direct
@@ -31,7 +32,7 @@ Application-level allowlists are intentionally outside v1.
 
 Local development is supported on Linux x86-64 and requires:
 
-- [Python 3.14](https://www.python.org/)
+- [Python 3.14](https://www.python.org/) on Linux x86-64 with AVX2
 - [uv](https://docs.astral.sh/uv/)
 - [FFmpeg](https://ffmpeg.org/) with the Opus encoder
 - a bot token created with [BotFather](https://t.me/BotFather), for Telegram operation
@@ -51,10 +52,10 @@ uv sync --locked --all-groups
 uv run pre-commit install
 ```
 
-Provision the pinned `ru_RU-denis-medium` model into the ignored local model directory:
+Provision the pinned `v5_5_ru` model into the ignored local model directory:
 
 ```bash
-uv run python -m telegram_tts_bot.speech.model --output-dir .models/piper
+uv run python -m telegram_tts_bot.speech.model --output-dir .models/silero
 ```
 
 Install FFmpeg with your operating-system package manager, then verify the renderer
@@ -99,17 +100,41 @@ and verification checklist are maintained in
 
 ## Configuration
 
-| Variable | Required | Default | Meaning |
-| --- | --- | --- | --- |
-| `TELEGRAM_BOT_TOKEN` | Bot only | - | Secret token issued by BotFather. |
-| `PIPER_MODEL_PATH` | No | Local or baked model | Path to `ru_RU-denis-medium.onnx`. |
-| `PIPER_CONFIG_PATH` | No | Local or baked config | Path to the matching `.onnx.json`. |
-| `TTS_MAX_CONCURRENCY` | No | `5` | Maximum active render pipelines process-wide. |
-| `TTS_MAX_CONCURRENCY_PER_USER` | No | `1` | Maximum active pipelines for one Telegram user. |
-| `LOG_LEVEL` | No | `INFO` | Standard Python logging level. |
+| Variable | Required | Default             | Meaning |
+| --- | --- |---------------------| --- |
+| `TELEGRAM_BOT_TOKEN` | Bot only | -                   | Secret token issued by BotFather. |
+| `SILERO_MODEL_PATH` | No | Local or baked model | Path to the verified `v5_5_ru.pt`. |
+| `TTS_VOICE` | No | `kseniya` p         | One of `kseniya`, `xenia`, or `baya`. |
+| `TTS_MAX_CONCURRENCY` | No | `2`                 | Maximum active render pipelines process-wide. |
+| `TTS_MAX_CONCURRENCY_PER_USER` | No | `1`                 | Maximum active pipelines for one Telegram user. |
+| `LOG_LEVEL` | No | `INFO`              | Standard Python logging level. |
 
 Both capacity values must be positive integers, and the per-user value cannot exceed the
 global value. Configuration is validated once at startup and remains immutable.
+
+The audition labels map to configuration as follows:
+
+| Audition sample | `TTS_VOICE` |
+| --- | --- |
+| A | `kseniya` |
+| B | `xenia` |
+| F | `baya` |
+
+All three speakers are included in the same model. Set one value in `.env` or the
+process environment and restart the bot to change the process-wide voice:
+
+```bash
+TTS_VOICE=xenia
+```
+
+The model is Russian-first. Cyrillic text and ordinary punctuation are retained; Latin
+letters are deterministically transliterated, digits are read individually, and
+symbol-only input speaks sign names. This compatibility behavior is phonetic rather than
+language-aware translation.
+
+The bundled model is CC BY-NC-SA 4.0 and is limited to non-commercial use. A commercial
+deployment requires separate permission from Silero; see
+[Third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## TTS command
 
@@ -141,17 +166,18 @@ flowchart LR
     gate --> renderer[VoiceRenderer]
     stdin[stdin CLI] --> renderer
     renderer --> synth[WaveSynthesizer]
-    synth --> piper[Piper adapter]
+    synth --> silero[Silero adapter]
     renderer --> opus[FFmpeg OGG/Opus encoder]
     opus --> voice[voice-note bytes]
     voice --> telegram_api[Telegram sendVoice]
     voice --> file[explicit CLI file]
 ```
 
-Telegram handlers and the CLI depend on `VoiceRenderer`, not Piper or FFmpeg. Piper is
-the sole v1 `WaveSynthesizer`; replacing the engine means adding one adapter and changing
-composition, not editing message handlers. The bot loads one model per process and runs
-blocking synthesis and encoding in a dedicated executor.
+Telegram handlers and the CLI depend on `VoiceRenderer`, not Silero or FFmpeg. Silero is
+the sole production `WaveSynthesizer`; replacing the engine means adding one adapter and
+changing composition, not editing message handlers. The bot loads one model and one
+configured speaker per process and runs blocking synthesis and encoding in a dedicated
+executor.
 
 No runtime component downloads a model, opens a database, creates a cache, or stores
 input. Telegram still necessarily receives messages and returned voice notes as part of
@@ -172,9 +198,10 @@ Run it with the ignored environment file:
 docker run --rm --init --env-file .env vslukh:local
 ```
 
-The image runs as an unprivileged user, contains the voice at `/opt/piper`, and needs no
-volume. Stop the container with `SIGTERM`; the bot stops intake and drains active worker
-jobs before exiting. Exactly one polling replica may use a token at a time.
+The image runs as an unprivileged user, contains the model at `/opt/silero/v5_5_ru.pt`,
+and needs no volume. Stop the container with `SIGTERM`; the bot stops intake and drains
+active worker jobs before exiting. Exactly one polling replica may use a token at a
+time.
 
 Test the baked renderer without starting Telegram:
 
@@ -210,7 +237,7 @@ models, capacity, privacy, deployment, or BotFather metadata.
 
 Every push and pull request runs independent lint/build, unit-test, and real
 model/container jobs. A semver tag matching the project version, such as `v0.1.0`, also
-runs a five-way render test inside a two-CPU, 1 GiB container before publishing.
+runs a two-render test inside a two-CPU, 1 GiB container before publishing.
 
 Successful tags publish a non-root linux/amd64 image to GHCR with exact semver, commit
 SHA, and `latest` tags, then create a GitHub release containing the Python artifacts and
@@ -230,9 +257,9 @@ ffprobe -version
 
 ### Model verification fails
 
-Delete only the ignored `.models/piper` directory and rerun the explicit provisioning
+Delete only the ignored `.models/silero` directory and rerun the explicit provisioning
 helper. Never substitute an unverified file under the accepted model filename. The
-canonical revision and SHA-256 values live in SPEC-0001.
+canonical source and SHA-256 value live in SPEC-0004.
 
 ### Telegram reports a polling conflict
 
@@ -255,3 +282,7 @@ Vslukh is licensed under
 [GNU GPL-3.0-or-later](LICENSE). Bundled and containerized third-party components are
 described in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Please report security
 issues through the private process in [SECURITY.md](SECURITY.md).
+
+The application license does not replace the separately bundled Silero model's
+CC BY-NC-SA 4.0 terms. The model is for non-commercial use unless separate permission
+has been obtained from Silero.

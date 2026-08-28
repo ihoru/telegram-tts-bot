@@ -7,26 +7,66 @@ import pytest
 from telegram_tts_bot.speech import create_voice_renderer
 
 
-def _configured_model_paths() -> tuple[Path, Path]:
-    model_path = Path(os.environ.get("PIPER_MODEL_PATH", ""))
-    config_path = Path(os.environ.get("PIPER_CONFIG_PATH", ""))
-    if not model_path.is_file() or not config_path.is_file():
-        pytest.skip("pinned Piper assets are not configured")
-    return model_path, config_path
+def _configured_model_path() -> Path:
+    model_path = Path(os.environ.get("SILERO_MODEL_PATH", ""))
+    if not model_path.is_file():
+        pytest.skip("pinned Silero model is not configured")
+    return model_path
+
+
+@pytest.mark.integration
+async def test_every_supported_speaker_renders_with_the_real_model() -> None:
+    model_path = _configured_model_path()
+
+    for speaker in ("kseniya", "xenia", "baya"):
+        renderer = create_voice_renderer(model_path, speaker, max_workers=1)
+        try:
+            rendered = await renderer.render("Проверка выбранного голоса.")
+        finally:
+            await renderer.close()
+
+        assert rendered.data.startswith(b"OggS")
+
+
+@pytest.mark.integration
+async def test_maximum_length_text_renders_through_real_model_chunking() -> None:
+    model_path = _configured_model_path()
+    text = ("Проверка длинного сообщения. " * 200)[:4096]
+    assert len(text) == 4096
+
+    renderer = create_voice_renderer(model_path, "kseniya", max_workers=1)
+    try:
+        rendered = await renderer.render(text)
+    finally:
+        await renderer.close()
+
+    assert rendered.data.startswith(b"OggS")
+
+
+@pytest.mark.integration
+async def test_non_cyrillic_text_renders_through_real_model_fallback() -> None:
+    model_path = _configured_model_path()
+    renderer = create_voice_renderer(model_path, "kseniya", max_workers=1)
+    try:
+        for text in ("Hello, world!", "1234567890", "!?.,:;", "Привет, Hello 123!"):
+            rendered = await renderer.render(text)
+            assert rendered.data.startswith(b"OggS")
+    finally:
+        await renderer.close()
 
 
 @pytest.mark.integration
 @pytest.mark.stress
-async def test_five_shared_model_renders_complete_under_resource_limit() -> None:
-    model_path, config_path = _configured_model_paths()
+async def test_two_shared_model_renders_complete_under_resource_limit() -> None:
+    model_path = _configured_model_path()
 
-    renderer = create_voice_renderer(model_path, config_path, max_workers=5)
+    renderer = create_voice_renderer(model_path, "kseniya", max_workers=2)
     try:
         rendered = await asyncio.gather(
-            *(renderer.render("Проверка одновременного синтеза речи.") for _ in range(5))
+            *(renderer.render("Проверка одновременного синтеза речи. " * 12) for _ in range(2))
         )
     finally:
         await renderer.close()
 
-    assert len(rendered) == 5
+    assert len(rendered) == 2
     assert all(audio.data.startswith(b"OggS") for audio in rendered)

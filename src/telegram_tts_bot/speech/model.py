@@ -1,4 +1,4 @@
-"""Explicit provisioning for the pinned Piper voice assets."""
+"""Explicit provisioning for the pinned Silero voice model."""
 
 import argparse
 import hashlib
@@ -10,11 +10,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from telegram_tts_bot.speech.piper import CONFIG_SHA256, MODEL_SHA256
+from telegram_tts_bot.speech.silero import MODEL_SHA256
 
-REVISION = "39ab474be869e9181350af6a65e4953eef67aaa0"
-VOICE_ROOT = "ru/ru_RU/denis/medium"
-BASE_URL = f"https://huggingface.co/rhasspy/piper-voices/resolve/{REVISION}/{VOICE_ROOT}"
+MODEL_FILENAME = "v5_5_ru.pt"
+BASE_URL = "https://models.silero.ai/models/tts/ru"
+MODEL_URL = f"{BASE_URL}/{MODEL_FILENAME}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,13 +24,10 @@ class Asset:
 
     @property
     def url(self) -> str:
-        return f"{BASE_URL}/{self.filename}?download=true"
+        return f"{BASE_URL}/{self.filename}"
 
 
-ASSETS = (
-    Asset("ru_RU-denis-medium.onnx", MODEL_SHA256),
-    Asset("ru_RU-denis-medium.onnx.json", CONFIG_SHA256),
-)
+ASSETS = (Asset(MODEL_FILENAME, MODEL_SHA256),)
 
 
 def _download(asset: Asset, output_dir: Path) -> Path:
@@ -81,12 +78,12 @@ def provision(output_dir: Path) -> tuple[Path, ...]:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Download the pinned Vslukh Piper model")
+    parser = argparse.ArgumentParser(description="Download the pinned Vslukh Silero model")
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path(".models/piper"),
-        help="asset directory (default: .models/piper)",
+        default=Path(".models/silero"),
+        help="asset directory (default: .models/silero)",
     )
     return parser
 

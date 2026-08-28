@@ -1,13 +1,17 @@
 ---
 id: "0002"
 title: Bilingual welcome and privacy policy
-status: accepted
+status: superseded
 created: 2026-08-27
-updated: 2026-08-27
+updated: 2026-08-28
 supersedes: "0001"
+superseded_by: "0004"
 ---
 
 # SPEC-0002: Bilingual welcome and privacy policy
+
+Superseded by SPEC-0004. SPEC-0004 retains this contract while replacing the speech
+model, provider configuration, and safe default concurrency.
 
 ## Summary
 

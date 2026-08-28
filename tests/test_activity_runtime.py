@@ -97,14 +97,18 @@ async def test_run_bot_preserves_updates_and_closes_resources_in_order(
     fake_bot = RuntimeBot("123:token", events)
 
     def renderer_factory(**kwargs: object) -> VoiceRenderer:
-        assert kwargs["max_workers"] == 5
+        assert kwargs == {
+            "model_path": settings.silero_model_path,
+            "speaker": "xenia",
+            "max_workers": 2,
+        }
         return cast(VoiceRenderer, renderer)
 
     def dispatcher_factory(_service: object, _activity: object) -> Dispatcher:
         return cast(Dispatcher, RuntimeDispatcher(events))
 
     monkeypatch.setattr(runtime, "create_dispatcher", dispatcher_factory)
-    settings = BotSettings(telegram_bot_token="123:token")
+    settings = BotSettings(telegram_bot_token="123:token", tts_voice="xenia")
 
     await run_bot(
         settings,
@@ -196,19 +200,12 @@ async def test_run_bot_preserves_polling_failure_when_cleanup_also_fails(
     assert events == ["webhook_deleted", "session_closed"]
 
 
-def test_debug_logging_cannot_emit_piper_source_text(
-    caplog: pytest.LogCaptureFixture,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    piper_logger = logging.getLogger("piper")
-    monkeypatch.setattr(piper_logger, "level", logging.NOTSET)
+def test_configure_logging_suppresses_update_identity_logs() -> None:
     configure_logging(logging.DEBUG)
 
-    with caplog.at_level(logging.DEBUG):
-        logging.getLogger("piper.voice").warning("text=%s", "PRIVATE_MESSAGE_SENTINEL")
-
-    assert piper_logger.level > logging.CRITICAL
-    assert "PRIVATE_MESSAGE_SENTINEL" not in caplog.text
+    assert logging.getLogger("aiogram.dispatcher").level == logging.WARNING
+    assert logging.getLogger("aiogram.event").level == logging.CRITICAL
+    assert logging.getLogger("aiohttp").level == logging.WARNING
 
 
 def test_create_dispatcher_exposes_speech_service() -> None:

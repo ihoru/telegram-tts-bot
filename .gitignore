@@ -21,6 +21,7 @@ htmlcov/
 *.ogg
 *.wav
 *.txt
+!licenses/*.txt
 
 # Editors and operating systems
 .DS_Store

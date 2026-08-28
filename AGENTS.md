@@ -8,10 +8,10 @@ and the active linked specifications. Create and accept a numbered spec before
 implementing a new capability or changing an existing contract; supersede implemented
 specifications instead of rewriting their decisions.
 
-Keep v1 narrow: one private-chat polling bot, one bundled Russian Piper voice, one OGG
-renderer, and no persistence. Put Telegram concerns in handlers, admission control in
-the bot service, synthesis behind `WaveSynthesizer`, and process assembly in the
-composition module.
+Keep v1 narrow: one private-chat polling bot, one bundled Russian Silero model with one
+startup-selected speaker, one OGG renderer, and no persistence. Put Telegram concerns
+in handlers, admission control in the bot service, synthesis behind `WaveSynthesizer`,
+and process assembly in the composition module.
 
 ## Required checks
 

@@ -35,7 +35,7 @@ Unit tests use fakes and do not need the real voice. Provision it only for integ
 work:
 
 ```bash
-uv run python -m telegram_tts_bot.speech.model --output-dir .models/piper
+uv run python -m telegram_tts_bot.speech.model --output-dir .models/silero
 ```
 
 Never commit `.env`, `.models`, generated OGG/WAV files, Telegram updates, or logs that
@@ -45,7 +45,7 @@ contain user data.
 
 - Keep Telegram concerns in handlers, admission policy in the bot service, speech behind
   `WaveSynthesizer`, encoding in the renderer, and construction in composition.
-- Do not make handlers or the CLI import Piper or FFmpeg implementation details.
+- Keep handlers and the CLI independent of Silero and FFmpeg implementation details.
 - Do not add runtime downloads, persistence, queues, provider registries, or deployment
   machinery without an accepted specification.
 - Preserve exact user input through the renderer and never include it in logs, exceptions,
@@ -67,7 +67,7 @@ uv run pre-commit run --all-files
 
 Pytest enforces at least 90% branch coverage. Tests marked `integration` require system
 dependencies or real model assets; tests marked `stress` exercise the constrained
-five-render path. Keep ordinary tests deterministic and network-free.
+two-render path. Keep ordinary tests deterministic and network-free.
 
 Pre-commit intentionally runs Ruff with fixes. If it changes files, inspect them, stage
 them yourself, and rerun the commit. Hooks must never invoke `git add`.

@@ -7,6 +7,7 @@ from typing import Self
 import pytest
 
 from telegram_tts_bot.speech import model
+from telegram_tts_bot.speech.silero import MODEL_SHA256
 
 
 class Response:
@@ -32,22 +33,22 @@ def test_provision_downloads_and_reuses_verified_asset(
     tmp_path: Path,
 ) -> None:
     payload = b"model"
-    asset = model.Asset("voice.onnx", hashlib.sha256(payload).hexdigest())
+    asset = model.Asset("voice.pt", hashlib.sha256(payload).hexdigest())
     monkeypatch.setattr(model, "ASSETS", (asset,))
     calls = 0
 
     def urlopen(url: str, timeout: int) -> Response:
         nonlocal calls
         calls += 1
-        assert "voice.onnx" in url
+        assert "voice.pt" in url
         assert timeout == 60
         return Response(payload)
 
     monkeypatch.setattr(urllib.request, "urlopen", urlopen)
 
-    assert model.provision(tmp_path) == (tmp_path / "voice.onnx",)
-    assert model.provision(tmp_path) == (tmp_path / "voice.onnx",)
-    assert (tmp_path / "voice.onnx").read_bytes() == payload
+    assert model.provision(tmp_path) == (tmp_path / "voice.pt",)
+    assert model.provision(tmp_path) == (tmp_path / "voice.pt",)
+    assert (tmp_path / "voice.pt").read_bytes() == payload
     assert calls == 1
 
 
@@ -79,3 +80,10 @@ def test_model_main_reports_paths_and_failures(
     monkeypatch.setattr(model, "provision", fail)
     assert model.main(["--output-dir", str(output)]) == 1
     assert "Model provisioning failed" in capsys.readouterr().err
+
+
+def test_pinned_model_coordinates_and_cli_default() -> None:
+    assert len(model.ASSETS) == 1
+    assert model.ASSETS[0] == model.Asset(model.MODEL_FILENAME, MODEL_SHA256)
+    assert model.ASSETS[0].url == model.MODEL_URL
+    assert model._parser().parse_args([]).output_dir == Path(".models/silero")

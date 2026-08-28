@@ -28,9 +28,6 @@ def configure_logging(level: int) -> None:
     logging.getLogger("aiogram.dispatcher").setLevel(logging.WARNING)
     logging.getLogger("aiogram.event").setLevel(logging.CRITICAL)
     logging.getLogger("aiohttp").setLevel(logging.WARNING)
-    # Piper logs source text and input-derived phonemes at DEBUG/WARNING. Provider
-    # output is disabled at every application log level to uphold the privacy contract.
-    logging.getLogger("piper").setLevel(logging.CRITICAL + 1)
 
 
 def create_dispatcher(
@@ -90,8 +87,8 @@ async def run_bot(
     primary_error: BaseException | None = None
     try:
         renderer = renderer_factory(
-            model_path=settings.piper_model_path,
-            config_path=settings.piper_config_path,
+            model_path=settings.silero_model_path,
+            speaker=settings.tts_voice,
             max_workers=settings.max_concurrency,
         )
         speech_service = BotSpeechService(

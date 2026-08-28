@@ -24,8 +24,9 @@ Statuses are `draft`, `accepted`, `implemented`, `rejected`, and `superseded`.
 | ID | Title | Status | Superseded by |
 | --- | --- | --- | --- |
 | 0001 | Initial Telegram TTS bot | superseded | 0002 |
-| 0002 | Bilingual welcome and privacy policy | accepted | - |
+| 0002 | Bilingual welcome and privacy policy | superseded | 0004 |
 | 0003 | Record-voice chat action | implemented | - |
+| 0004 | Configurable Silero voices | accepted | - |
 
 `BOTFATHER.md` contains the operational profile pack accepted by the current numbered
 specification. Changes to that pack require a new numbered specification.

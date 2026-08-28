@@ -6,7 +6,7 @@ from telegram_tts_bot.speech import factory
 from telegram_tts_bot.speech.renderer import VoiceRenderer
 
 
-def test_factory_verifies_encoder_and_loads_piper(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_factory_verifies_encoder_and_loads_silero(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[object] = []
 
     class Encoder:
@@ -18,14 +18,14 @@ def test_factory_verifies_encoder_and_loads_piper(monkeypatch: pytest.MonkeyPatc
 
     class Synthesizer:
         @classmethod
-        def load(cls, model: Path, config: Path) -> object:
-            calls.append((model, config))
+        def load(cls, model: Path, speaker: str) -> object:
+            calls.append((model, speaker))
             return object()
 
     monkeypatch.setattr(factory, "FfmpegVoiceEncoder", Encoder)
-    monkeypatch.setattr(factory, "PiperWaveSynthesizer", Synthesizer)
+    monkeypatch.setattr(factory, "SileroWaveSynthesizer", Synthesizer)
 
-    renderer = factory.create_voice_renderer(Path("model"), Path("config"), 2)
+    renderer = factory.create_voice_renderer(Path("model.pt"), "baya", 2)
 
     assert isinstance(renderer, VoiceRenderer)
-    assert calls == ["ffmpeg", (Path("model"), Path("config"))]
+    assert calls == ["ffmpeg", (Path("model.pt"), "baya")]

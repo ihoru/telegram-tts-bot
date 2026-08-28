@@ -5,33 +5,45 @@ image, redistributes third-party software and model assets under their own terms
 summary is informational; the upstream license text and package metadata are
 authoritative.
 
-## Piper
+## Silero speech model
 
-- Project: [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl)
-- Use: local neural text-to-speech runtime, installed through `piper-tts`
-- License: GNU GPL-3.0-or-later
+- Creator: Silero Team
+- Work: *Silero Models: pre-trained text-to-speech models made embarrassingly simple*
+- Project: [snakers4/silero-models](https://github.com/snakers4/silero-models)
+- Attribution metadata revision:
+  `d9355348e2781dc8fa25a135d1602c530afae24c`
+- Artifact: [`v5_5_ru.pt`](https://models.silero.ai/models/tts/ru/v5_5_ru.pt)
+- Use: local Russian speech synthesis with the `kseniya`, `xenia`, or `baya` speaker
+- License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+  (CC BY-NC-SA 4.0)
+- Contact for separate terms: `hello@silero.ai`
 
-Piper and its Python/transitive dependency versions are recorded exactly in `uv.lock`.
+The unmodified model weight is a separately licensed component. Its full terms are
+retained in
+[`licenses/silero-models-CC-BY-NC-SA-4.0.txt`](licenses/silero-models-CC-BY-NC-SA-4.0.txt).
+The bundled weight may be used and redistributed only within the license's defined
+NonCommercial restriction. Other use requires separate permission from Silero. Adapted
+model material is subject to ShareAlike; Vslukh does not modify the distributed weight.
+The application remains GPL-3.0-or-later, and no claim is made here about the license of
+generated speech.
 
-## `ru_RU-denis-medium` voice
-
-- Source: [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices)
-- Immutable revision: `39ab474be869e9181350af6a65e4953eef67aaa0`
-- Model card: [Denis medium](https://huggingface.co/rhasspy/piper-voices/blob/39ab474be869e9181350af6a65e4953eef67aaa0/ru/ru_RU/denis/medium/MODEL_CARD)
-- Repository metadata license: MIT
-- Training dataset license declared by the model card: CC0
-
-The pinned upstream revision declares MIT in its repository metadata but does not contain
-a standalone license file. The standard terms are retained in
-[`licenses/piper-voices-MIT.txt`](licenses/piper-voices-MIT.txt), and the exact upstream
-model card is copied into the runtime image beside these notices.
-
-Bundled files are integrity-pinned:
+The artifact is integrity-pinned:
 
 | File | SHA-256 |
 | --- | --- |
-| `ru_RU-denis-medium.onnx` | `15fab56e11a097858ee115545d0f697fc2a316c41a291a5362349fb870411b0a` |
-| `ru_RU-denis-medium.onnx.json` | `831c860dac0b5073eaa81610a0a638ec23d90a6cf8e5f871b4485c2cec3767c8` |
+| `v5_5_ru.pt` | `50081637b602126ee06cb3bc8a744d25651d2da149ee8864b9a379bfdd934437` |
+
+## PyTorch and NumPy
+
+- [PyTorch](https://pytorch.org/) provides the CPU inference runtime. Its installed
+  package metadata records the expression `Apache-2.0 AND Apache-2.0 WITH LLVM-exception
+  AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT`.
+- [NumPy](https://numpy.org/) converts the generated tensor to PCM samples. Its installed
+  package metadata records the expression
+  `BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0`.
+
+Their exact versions and transitive dependency graph are recorded in `uv.lock`. The
+installed wheels retain every file named by their `License-File` metadata.
 
 ## Container runtime components
 

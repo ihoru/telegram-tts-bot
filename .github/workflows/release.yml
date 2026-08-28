@@ -48,7 +48,7 @@ jobs:
         run: uv build
 
   stress:
-    name: Constrained five-render stress test
+    name: Constrained two-render stress test
     needs: quality
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -68,15 +68,24 @@ jobs:
           tags: vslukh:test
           cache-from: type=gha,scope=test
           cache-to: type=gha,mode=max,scope=test
-      - name: Run real shared-model stress test under host limits
+      - name: Run real-model integration tests
+        run: >-
+          docker run --rm vslukh:test
+          /app/.venv/bin/pytest --no-cov
+          -m "integration and not stress" -s
+      - name: Run two shared-model renders under host limits
         run: |
+          # Collect only the stress node so the 1 GiB measurement covers the production
+          # render pipeline instead of importing the entire pytest suite.
           docker run --rm \
             --cpus 2 \
             --memory 1g \
             --memory-swap 1g \
             --entrypoint /usr/bin/time \
             vslukh:test \
-            -v uv run --locked pytest --no-cov -m "integration and stress" -s
+            -v /app/.venv/bin/pytest --no-cov \
+            tests/speech/test_real_model.py::test_two_shared_model_renders_complete_under_resource_limit \
+            -s
 
   publish:
     name: Publish GHCR image and GitHub release
@@ -122,6 +131,8 @@ jobs:
         with:
           images: ${{ steps.release.outputs.image }}
           flavor: latest=false
+          labels: |
+            org.opencontainers.image.licenses=GPL-3.0-or-later AND CC-BY-NC-SA-4.0
           tags: |
             type=semver,pattern={{version}}
             type=sha,format=long,prefix=

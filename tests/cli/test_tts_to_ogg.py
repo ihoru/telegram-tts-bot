@@ -1,9 +1,11 @@
 import asyncio
+import importlib
 import io
 import os
 import sys
 from collections.abc import Coroutine
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -66,6 +68,73 @@ def test_cli_validates_path_before_rendering(
     assert tts_to_ogg.main([str(output)]) == 2
     assert not rendered
     assert "parent directory" in capsys.readouterr().err
+
+
+def test_cli_validates_input_and_path_before_importing_torch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    imported = False
+
+    def unexpected_import(_name: str) -> object:
+        nonlocal imported
+        imported = True
+        raise AssertionError("torch must remain lazy")
+
+    monkeypatch.setattr(importlib, "import_module", unexpected_import)
+    monkeypatch.setattr(tts_to_ogg, "_read_stdin", lambda: "text")
+
+    assert tts_to_ogg.main([str(tmp_path / "missing" / "sample.ogg")]) == 2
+    assert not imported
+
+
+def test_cli_wires_silero_environment_without_telegram_token(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    calls: list[object] = []
+
+    class Renderer:
+        async def render(self, text: str) -> object:
+            calls.append(text)
+            return SimpleNamespace(data=b"ogg")
+
+        async def close(self) -> None:
+            calls.append("closed")
+
+    def renderer_factory(**kwargs: object) -> Renderer:
+        calls.append(kwargs)
+        return Renderer()
+
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.setenv("SILERO_MODEL_PATH", str(tmp_path / "model.pt"))
+    monkeypatch.setenv("TTS_VOICE", "xenia")
+    monkeypatch.setattr(tts_to_ogg, "create_voice_renderer", renderer_factory)
+
+    assert asyncio.run(tts_to_ogg._render("private text")) == b"ogg"
+    assert calls == [
+        {
+            "model_path": (tmp_path / "model.pt").resolve(),
+            "speaker": "xenia",
+            "max_workers": 1,
+        },
+        "private text",
+        "closed",
+    ]
+
+
+def test_cli_rejects_unsupported_voice_after_input_validation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("TTS_VOICE", "denis")
+    monkeypatch.setattr(tts_to_ogg, "_read_stdin", lambda: "text")
+    output = tmp_path / "sample.ogg"
+
+    assert tts_to_ogg.main([str(output)]) == 2
+    assert not output.exists()
+    assert "kseniya, xenia, baya" in capsys.readouterr().err
 
 
 def test_cli_refuses_overwrite_and_force_replaces_atomically(

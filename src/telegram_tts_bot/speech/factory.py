@@ -3,17 +3,17 @@
 from pathlib import Path
 
 from telegram_tts_bot.speech.encoding import FfmpegVoiceEncoder
-from telegram_tts_bot.speech.piper import PiperWaveSynthesizer
 from telegram_tts_bot.speech.renderer import VoiceRenderer
+from telegram_tts_bot.speech.silero import SileroWaveSynthesizer
 
 
 def create_voice_renderer(
     model_path: Path,
-    config_path: Path,
+    speaker: str,
     max_workers: int,
 ) -> VoiceRenderer:
-    """Build the single v1 renderer and verify dependencies up front."""
+    """Build the production renderer and verify dependencies up front."""
     encoder = FfmpegVoiceEncoder()
     encoder.verify_available()
-    synthesizer = PiperWaveSynthesizer.load(model_path, config_path)
+    synthesizer = SileroWaveSynthesizer.load(model_path, speaker)
     return VoiceRenderer(synthesizer, encoder, max_workers=max_workers)

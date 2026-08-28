@@ -37,8 +37,9 @@ personal, alpha-stage project.
 - Vslukh stores no Telegram messages or rendered audio. It keeps data in process memory
   only for rendering and upload. The CLI writes only the explicitly requested output.
 - Logs omit message text, names, usernames, forwarding metadata, and token values.
-- Models are fixed to an immutable upstream revision and SHA-256 verified before use.
-  Runtime model downloads are disabled.
+- The Silero PyTorch package contains executable model code. Only the documented
+  `v5_5_ru.pt` SHA-256 is accepted before deserialization, and runtime model downloads
+  are disabled. Treat model-path overrides as trusted deployment inputs.
 - Release actions and container bases are pinned to immutable digests; tagged releases
   carry SBOM and provenance attestations.
 - The runtime image uses an unprivileged user and needs no writable volume.
@@ -59,6 +60,6 @@ or create end-to-end confidentiality.
   inbound ports.
 - Do not mount the Docker socket, source repository, model directory, or host secrets into
   the runtime container.
-- Keep default concurrency on a two-CPU, 1 GiB host unless a constrained stress test
-  proves a different setting safe.
+- Keep the default concurrency of two on a two-CPU, 1 GiB host unless a constrained
+  stress test proves a different setting safe.
 - Roll back by redeploying a previously trusted immutable image digest.

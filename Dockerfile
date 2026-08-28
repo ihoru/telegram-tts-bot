@@ -5,15 +5,9 @@
 FROM ghcr.io/astral-sh/uv:0.11.28@sha256:5c3ab83183a73c5d319a77009eb425b60d5bb937f339fb7876788ebf567baf48 AS uv
 
 FROM scratch AS voice
-ADD --checksum=sha256:15fab56e11a097858ee115545d0f697fc2a316c41a291a5362349fb870411b0a \
-    https://huggingface.co/rhasspy/piper-voices/resolve/39ab474be869e9181350af6a65e4953eef67aaa0/ru/ru_RU/denis/medium/ru_RU-denis-medium.onnx \
-    /voice/ru_RU-denis-medium.onnx
-ADD --checksum=sha256:831c860dac0b5073eaa81610a0a638ec23d90a6cf8e5f871b4485c2cec3767c8 \
-    https://huggingface.co/rhasspy/piper-voices/resolve/39ab474be869e9181350af6a65e4953eef67aaa0/ru/ru_RU/denis/medium/ru_RU-denis-medium.onnx.json \
-    /voice/ru_RU-denis-medium.onnx.json
-ADD --checksum=sha256:8b5d685dd80f8ad3f8dbbe1c56b16bb0809f00c144af3642dbcf3b707eb89c12 \
-    https://huggingface.co/rhasspy/piper-voices/raw/39ab474be869e9181350af6a65e4953eef67aaa0/ru/ru_RU/denis/medium/MODEL_CARD \
-    /voice/MODEL_CARD
+ADD --checksum=sha256:50081637b602126ee06cb3bc8a744d25651d2da149ee8864b9a379bfdd934437 \
+    https://models.silero.ai/models/tts/ru/v5_5_ru.pt \
+    /voice/v5_5_ru.pt
 
 FROM python:3.14.6-slim-bookworm@sha256:ff83a535339812dd72e69c93b3c48ddf7c85a324d6330af5797c82a255dbeef4 AS build
 
@@ -37,10 +31,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --all-groups --no-editable
-COPY --from=voice /voice /opt/piper
+COPY --from=voice /voice /opt/silero
 COPY tests ./tests
-ENV PIPER_MODEL_PATH=/opt/piper/ru_RU-denis-medium.onnx \
-    PIPER_CONFIG_PATH=/opt/piper/ru_RU-denis-medium.onnx.json
+ENV SILERO_MODEL_PATH=/opt/silero/v5_5_ru.pt \
+    TTS_VOICE=kseniya \
+    TTS_MAX_CONCURRENCY=2
 CMD ["uv", "run", "--locked", "pytest"]
 
 FROM python:3.14.6-slim-bookworm@sha256:ff83a535339812dd72e69c93b3c48ddf7c85a324d6330af5797c82a255dbeef4 AS runtime
@@ -51,7 +46,7 @@ ARG VCS_REF=unknown
 
 LABEL org.opencontainers.image.title="Vslukh" \
       org.opencontainers.image.description="Local-first Telegram text-to-speech bot" \
-      org.opencontainers.image.licenses="GPL-3.0-or-later" \
+      org.opencontainers.image.licenses="GPL-3.0-or-later AND CC-BY-NC-SA-4.0" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}"
 
@@ -66,17 +61,15 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=build --chown=${APP_UID}:${APP_UID} /app/.venv /app/.venv
-COPY --from=voice --chown=${APP_UID}:${APP_UID} \
-    /voice/ru_RU-denis-medium.onnx \
-    /voice/ru_RU-denis-medium.onnx.json \
-    /opt/piper/
-COPY --from=voice /voice/MODEL_CARD /usr/share/doc/vslukh/piper-voice/MODEL_CARD
-COPY LICENSE THIRD_PARTY_NOTICES.md licenses/piper-voices-MIT.txt /usr/share/doc/vslukh/
+COPY --from=voice --chown=${APP_UID}:${APP_UID} /voice/v5_5_ru.pt /opt/silero/
+COPY LICENSE THIRD_PARTY_NOTICES.md licenses/silero-models-CC-BY-NC-SA-4.0.txt \
+    /usr/share/doc/vslukh/
 
 ENV HOME=/nonexistent \
     PATH=/app/.venv/bin:$PATH \
-    PIPER_MODEL_PATH=/opt/piper/ru_RU-denis-medium.onnx \
-    PIPER_CONFIG_PATH=/opt/piper/ru_RU-denis-medium.onnx.json \
+    SILERO_MODEL_PATH=/opt/silero/v5_5_ru.pt \
+    TTS_VOICE=kseniya \
+    TTS_MAX_CONCURRENCY=2 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 

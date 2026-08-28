@@ -8,8 +8,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-DEFAULT_MODEL_PATH = Path(".models/piper/ru_RU-denis-medium.onnx")
-DEFAULT_CONFIG_PATH = Path(".models/piper/ru_RU-denis-medium.onnx.json")
+DEFAULT_SILERO_MODEL_PATH = Path(".models/silero/v5_5_ru.pt")
+DEFAULT_TTS_VOICE = "kseniya"
+SUPPORTED_TTS_VOICES = ("kseniya", "xenia", "baya")
 
 
 class ConfigurationError(ValueError):
@@ -21,9 +22,9 @@ class BotSettings:
     """Validated settings that cannot change after startup."""
 
     telegram_bot_token: str
-    piper_model_path: Path = DEFAULT_MODEL_PATH
-    piper_config_path: Path = DEFAULT_CONFIG_PATH
-    max_concurrency: int = 5
+    silero_model_path: Path = DEFAULT_SILERO_MODEL_PATH
+    tts_voice: str = DEFAULT_TTS_VOICE
+    max_concurrency: int = 2
     max_concurrency_per_user: int = 1
     log_level: int = logging.INFO
 
@@ -34,7 +35,7 @@ class BotSettings:
         token = values.get("TELEGRAM_BOT_TOKEN", "")
         _validate_token(token)
 
-        max_concurrency = _positive_integer(values, "TTS_MAX_CONCURRENCY", default=5)
+        max_concurrency = _positive_integer(values, "TTS_MAX_CONCURRENCY", default=2)
         per_user = _positive_integer(values, "TTS_MAX_CONCURRENCY_PER_USER", default=1)
         if per_user > max_concurrency:
             raise ConfigurationError(
@@ -43,16 +44,22 @@ class BotSettings:
 
         return cls(
             telegram_bot_token=token,
-            piper_model_path=Path(
-                values.get("PIPER_MODEL_PATH", str(DEFAULT_MODEL_PATH))
+            silero_model_path=Path(
+                values.get("SILERO_MODEL_PATH", str(DEFAULT_SILERO_MODEL_PATH))
             ).expanduser(),
-            piper_config_path=Path(
-                values.get("PIPER_CONFIG_PATH", str(DEFAULT_CONFIG_PATH))
-            ).expanduser(),
+            tts_voice=validate_tts_voice(values.get("TTS_VOICE", DEFAULT_TTS_VOICE)),
             max_concurrency=max_concurrency,
             max_concurrency_per_user=per_user,
             log_level=_logging_level(values.get("LOG_LEVEL", "INFO")),
         )
+
+
+def validate_tts_voice(value: str) -> str:
+    """Return one exact supported speaker identifier or reject the setting."""
+    if value not in SUPPORTED_TTS_VOICES:
+        choices = ", ".join(SUPPORTED_TTS_VOICES)
+        raise ConfigurationError(f"TTS_VOICE must be one of: {choices}")
+    return value
 
 
 def _validate_token(token: str) -> None:

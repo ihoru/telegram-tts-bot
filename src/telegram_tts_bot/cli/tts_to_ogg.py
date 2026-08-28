@@ -8,6 +8,12 @@ import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
+from telegram_tts_bot.config import (
+    DEFAULT_SILERO_MODEL_PATH,
+    DEFAULT_TTS_VOICE,
+    ConfigurationError,
+    validate_tts_voice,
+)
 from telegram_tts_bot.speech import VoiceRenderError, create_voice_renderer
 
 
@@ -42,17 +48,12 @@ def _validate_destination(path: Path, *, force: bool) -> Path:
     return resolved
 
 
-def _model_paths() -> tuple[Path, Path]:
+def _speech_settings() -> tuple[Path, str]:
     model_path = Path(
-        os.environ.get("PIPER_MODEL_PATH", ".models/piper/ru_RU-denis-medium.onnx")
-    ).resolve()
-    config_path = Path(
-        os.environ.get(
-            "PIPER_CONFIG_PATH",
-            ".models/piper/ru_RU-denis-medium.onnx.json",
-        )
-    ).resolve()
-    return model_path, config_path
+        os.environ.get("SILERO_MODEL_PATH", str(DEFAULT_SILERO_MODEL_PATH))
+    ).expanduser()
+    speaker = validate_tts_voice(os.environ.get("TTS_VOICE", DEFAULT_TTS_VOICE))
+    return model_path.resolve(), speaker
 
 
 def _write_output(path: Path, data: bytes, *, force: bool) -> None:
@@ -82,8 +83,12 @@ def _write_output(path: Path, data: bytes, *, force: bool) -> None:
 
 
 async def _render(text: str) -> bytes:
-    model_path, config_path = _model_paths()
-    renderer = create_voice_renderer(model_path, config_path, max_workers=1)
+    model_path, speaker = _speech_settings()
+    renderer = create_voice_renderer(
+        model_path=model_path,
+        speaker=speaker,
+        max_workers=1,
+    )
     try:
         return (await renderer.render(text)).data
     finally:
@@ -109,6 +114,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 130
     except FileExistsError:
         print("tts-to-ogg: output file already exists; pass --force to replace it", file=sys.stderr)
+        return 2
+    except ConfigurationError as error:
+        print(f"tts-to-ogg: configuration error: {error}", file=sys.stderr)
         return 2
     except (OSError, VoiceRenderError, RuntimeError) as error:
         print(f"tts-to-ogg: rendering failed ({type(error).__name__})", file=sys.stderr)

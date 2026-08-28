@@ -13,9 +13,9 @@ def test_settings_use_documented_defaults() -> None:
     settings = BotSettings.from_environment({"TELEGRAM_BOT_TOKEN": VALID_TOKEN})
 
     assert settings.telegram_bot_token == VALID_TOKEN
-    assert settings.piper_model_path == Path(".models/piper/ru_RU-denis-medium.onnx")
-    assert settings.piper_config_path == Path(".models/piper/ru_RU-denis-medium.onnx.json")
-    assert settings.max_concurrency == 5
+    assert settings.silero_model_path == Path(".models/silero/v5_5_ru.pt")
+    assert settings.tts_voice == "kseniya"
+    assert settings.max_concurrency == 2
     assert settings.max_concurrency_per_user == 1
     assert settings.log_level == 20
 
@@ -23,15 +23,15 @@ def test_settings_use_documented_defaults() -> None:
 def test_settings_accept_safe_overrides() -> None:
     settings = BotSettings.from_environment({
         "TELEGRAM_BOT_TOKEN": VALID_TOKEN,
-        "PIPER_MODEL_PATH": "/models/voice.onnx",
-        "PIPER_CONFIG_PATH": "/models/voice.onnx.json",
+        "SILERO_MODEL_PATH": "~/models/voice.pt",
+        "TTS_VOICE": "baya",
         "TTS_MAX_CONCURRENCY": "8",
         "TTS_MAX_CONCURRENCY_PER_USER": "2",
         "LOG_LEVEL": "warning",
     })
 
-    assert settings.piper_model_path == Path("/models/voice.onnx")
-    assert settings.piper_config_path == Path("/models/voice.onnx.json")
+    assert settings.silero_model_path == Path("~/models/voice.pt").expanduser()
+    assert settings.tts_voice == "baya"
     assert settings.max_concurrency == 8
     assert settings.max_concurrency_per_user == 2
     assert settings.log_level == 30
@@ -63,6 +63,10 @@ def test_settings_accept_safe_overrides() -> None:
             {"TELEGRAM_BOT_TOKEN": VALID_TOKEN, "LOG_LEVEL": "verbose"},
             "LOG_LEVEL must be a standard logging level name",
         ),
+        (
+            {"TELEGRAM_BOT_TOKEN": VALID_TOKEN, "TTS_VOICE": "denis"},
+            "TTS_VOICE must be one of: kseniya, xenia, baya",
+        ),
     ],
 )
 def test_invalid_settings_are_secret_safe(
@@ -80,6 +84,16 @@ def test_settings_are_immutable() -> None:
 
     with pytest.raises(FrozenInstanceError):
         settings.max_concurrency = 10  # type: ignore[misc]
+
+
+@pytest.mark.parametrize("voice", ["kseniya", "xenia", "baya"])
+def test_settings_accept_every_supported_voice(voice: str) -> None:
+    settings = BotSettings.from_environment({
+        "TELEGRAM_BOT_TOKEN": VALID_TOKEN,
+        "TTS_VOICE": voice,
+    })
+
+    assert settings.tts_voice == voice
 
 
 @pytest.mark.parametrize("language_code", ["ru", "RU", "ru-RU", "ru_ua"])
