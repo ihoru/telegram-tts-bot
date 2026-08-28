@@ -2,14 +2,14 @@
 
 # This project deliberately publishes linux/amd64 only. Both source images resolve to
 # amd64 manifests, not mutable multi-platform indexes.
-FROM ghcr.io/astral-sh/uv:0.11.28@sha256:5c3ab83183a73c5d319a77009eb425b60d5bb937f339fb7876788ebf567baf48 AS uv
+FROM ghcr.io/astral-sh/uv:0.12.5@sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1 AS uv
 
 FROM scratch AS voice
 ADD --checksum=sha256:50081637b602126ee06cb3bc8a744d25651d2da149ee8864b9a379bfdd934437 \
     https://models.silero.ai/models/tts/ru/v5_5_ru.pt \
     /voice/v5_5_ru.pt
 
-FROM python:3.14.6-slim-bookworm@sha256:ff83a535339812dd72e69c93b3c48ddf7c85a324d6330af5797c82a255dbeef4 AS build
+FROM python:3.14.7-slim-bookworm@sha256:416f0db2a2b561945630cef9877a7ea0581b27449eb9fd9df42f03e1b74b5b63 AS build
 
 ENV SOURCE_DATE_EPOCH=0 \
     UV_LINK_MODE=copy \
@@ -38,7 +38,7 @@ ENV SILERO_MODEL_PATH=/opt/silero/v5_5_ru.pt \
     TTS_MAX_CONCURRENCY=2
 CMD ["uv", "run", "--locked", "pytest"]
 
-FROM python:3.14.6-slim-bookworm@sha256:ff83a535339812dd72e69c93b3c48ddf7c85a324d6330af5797c82a255dbeef4 AS runtime
+FROM python:3.14.7-slim-bookworm@sha256:416f0db2a2b561945630cef9877a7ea0581b27449eb9fd9df42f03e1b74b5b63 AS runtime
 
 ARG APP_UID=10001
 ARG APP_VERSION=0.1.0
