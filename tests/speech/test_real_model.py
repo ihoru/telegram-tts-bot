@@ -19,7 +19,7 @@ def _configured_qwen_model_path() -> Path:
     model_path = Path(os.environ.get("QWEN_MODEL_PATH", ""))
     try:
         verify_model_directory(model_path)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         pytest.skip("pinned Qwen model is not configured")
     return model_path
 

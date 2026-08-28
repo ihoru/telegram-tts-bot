@@ -1,6 +1,6 @@
 """Silero-specific waveform synthesis adapter."""
 
-# ruff: noqa: RUF001
+# ruff: file-ignore[ambiguous-unicode-character-string]
 # Russian fallback speech intentionally pairs Latin source keys with Cyrillic output.
 
 from __future__ import annotations
@@ -283,7 +283,7 @@ def _normalize_letters_and_digits(text: str) -> str:
             continue
         try:
             digit = unicodedata.digit(character)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             digit = None
         if digit is not None:
             _append_verbalized_token(
@@ -318,7 +318,7 @@ def _fallback_spoken_text(text: str) -> str:
             continue
         try:
             digit = unicodedata.digit(character)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             digit = None
         if digit is not None:
             spoken_parts.append(_DIGIT_WORDS[digit])
@@ -349,7 +349,8 @@ def _pcm_from_tensor(audio: _AudioTensor, torch_module: _TorchModule) -> bytes:
         raise ValueError("invalid audio sample")
 
     pcm_samples = (
-        audio.detach()
+        audio
+        .detach()
         .clamp(-1.0, 1.0)
         .mul(32_767)
         .round()
