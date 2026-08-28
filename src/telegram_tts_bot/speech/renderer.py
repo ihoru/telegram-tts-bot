@@ -10,7 +10,7 @@ from telegram_tts_bot.speech.types import VoiceAudio, WaveSynthesizer
 
 async def _wait_for_thread[Result](future: Future[Result]) -> Result:
     """Bridge a thread future without relying on the loop's thread wakeup callback."""
-    while not future.done():  # noqa: ASYNC110 - thread callback wakeups fail on Python 3.14.6
+    while not future.done():  # ruff: ignore[async-busy-wait] - thread callback wakeups fail on Python 3.14.6
         await asyncio.sleep(0.005)
     return future.result()
 
@@ -49,7 +49,7 @@ class VoiceRenderer:
             try:
                 return await _wait_for_thread(future)
             except asyncio.CancelledError:
-                while not future.done():  # noqa: ASYNC110 - preserve cancellation ownership
+                while not future.done():  # ruff: ignore[async-busy-wait] - preserve cancellation ownership
                     await asyncio.sleep(0.005)
                 raise
         finally:
@@ -63,6 +63,6 @@ class VoiceRenderer:
         if self._closed:
             return
         self._closed = True
-        while any(not future.done() for future in self._active):  # noqa: ASYNC110
+        while any(not future.done() for future in self._active):  # ruff: ignore[async-busy-wait]
             await asyncio.sleep(0.005)
         self._executor.shutdown(wait=True)
