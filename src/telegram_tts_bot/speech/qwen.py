@@ -27,6 +27,8 @@ SUPPORTED_SPEAKERS = {"aiden": "Aiden", "serena": "Serena"}
 LANGUAGE = "Auto"
 SEED = 20_260_828
 MAX_NEW_TOKENS = 2_048
+MAX_SEQUENCE_LENGTH = 2_048
+WARMUP_PREFILL_LENGTH = 100
 LOGGER = logging.getLogger(__name__)
 _OFFLINE_ENVIRONMENT = {
     "HF_HUB_OFFLINE": "1",
@@ -60,8 +62,8 @@ class _TorchModule(Protocol):
 
 
 class _QwenModel(Protocol):
-    def get_supported_speakers(self) -> Sequence[str] | None:
-        """Return the model's named speakers."""
+    def warmup(self, prefill_len: int = 100) -> None:
+        """Capture the CUDA graphs before serving requests."""
 
     def generate_custom_voice(
         self,
@@ -81,7 +83,7 @@ class _QwenModelClass(Protocol):
 
 
 class _QwenModule(Protocol):
-    Qwen3TTSModel: _QwenModelClass
+    FasterQwen3TTS: _QwenModelClass
 
 
 def _set_offline_environment() -> None:
@@ -133,18 +135,16 @@ class QwenWaveSynthesizer:
             if not torch_module.cuda.is_available() or not torch_module.cuda.is_bf16_supported():
                 raise ValueError("CUDA BF16 is unavailable")
             with redirect_stdout(io.StringIO()):
-                qwen_module = cast(_QwenModule, importlib.import_module("qwen_tts"))
-            model = qwen_module.Qwen3TTSModel.from_pretrained(
-                str(model_path),
-                device_map="cuda:0",
-                dtype=torch_module.bfloat16,
-                local_files_only=True,
-            )
-            speakers = model.get_supported_speakers()
-            if speakers is None or selected_speaker.casefold() not in {
-                speaker.casefold() for speaker in speakers
-            }:
-                raise ValueError("configured speaker is absent")
+                qwen_module = cast(_QwenModule, importlib.import_module("faster_qwen3_tts"))
+                model = qwen_module.FasterQwen3TTS.from_pretrained(
+                    str(model_path),
+                    device="cuda:0",
+                    dtype=torch_module.bfloat16,
+                    attn_implementation="sdpa",
+                    max_seq_len=MAX_SEQUENCE_LENGTH,
+                    local_files_only=True,
+                )
+                model.warmup(prefill_len=WARMUP_PREFILL_LENGTH)
         except Exception:
             raise SynthesisError("Qwen model could not be loaded") from None
         LOGGER.info("Qwen model loaded in %.1f seconds", perf_counter() - started_at)

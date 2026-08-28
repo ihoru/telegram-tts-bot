@@ -14,6 +14,7 @@ boundary before FFmpeg converts bot output to OGG/Opus.
 | Date | Suite | What was compared | Outcome |
 | --- | --- | --- | --- |
 | 2026-08-28 | [`mixed-ru-en-v1`](mixed-ru-en-v1/) | Piper 1.7.0 (3 voices), Silero `v5_5_ru` (5 voices), Qwen3-TTS 0.6B CustomVoice (3 voices) | Aiden selected as the default; Serena was retained as a configurable Qwen voice; the three selected Silero voices remain available. |
+| 2026-08-28 | [`mixed-ru-en-v1`](mixed-ru-en-v1/) | Qwen3-TTS 0.6B Aiden with `qwen-tts 0.1.1` versus `faster-qwen3-tts 0.4.0` | The accelerated deterministic result became the bot default implementation; the official-runtime WAV remains as history. |
 
 The machine-readable chronology, artifact hashes, source revisions, render parameters,
 and individual decisions live in each suite manifest. Future comparisons must create a

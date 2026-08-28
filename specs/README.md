@@ -27,9 +27,10 @@ Statuses are `draft`, `accepted`, `implemented`, `rejected`, and `superseded`.
 | 0002 | Bilingual welcome and privacy policy | superseded | 0004 |
 | 0003 | Record-voice chat action | implemented | - |
 | 0004 | Configurable Silero voices | superseded | 0005 |
-| 0005 | Local Qwen Aiden and Serena with Silero fallback voices | accepted | - |
+| 0005 | Local Qwen Aiden and Serena with Silero fallback voices | superseded | 0008 |
 | 0006 | Chronological mixed-language audition archive | accepted | - |
 | 0007 | Visible local Qwen provisioning and render progress | accepted | - |
+| 0008 | Faster Qwen CUDA-graph runtime | accepted | - |
 
 `BOTFATHER.md` contains the operational profile pack accepted by the current numbered
 specification. Changes to that pack require a new numbered specification.

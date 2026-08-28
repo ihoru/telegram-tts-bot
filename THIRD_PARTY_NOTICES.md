@@ -11,14 +11,25 @@ authoritative.
 - Work: *Qwen3-TTS-12Hz-0.6B-CustomVoice*
 - Model: [Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice)
 - Immutable model revision: `85e237c12c027371202489a0ec509ded67b5e4b5`
-- Inference package: `qwen-tts==0.1.1`
+- Inference compatibility package: `qwen-tts-hf==0.1.1.post1`
 - Use: local mixed Russian-English synthesis with the `Aiden` or `Serena` speaker
 - License: Apache License 2.0
 
 The production image contains the inference package but not the model snapshot. The
 explicit provisioner downloads and verifies the complete eleven-file snapshot before
-runtime. The Apache 2.0 text distributed with `qwen-tts==0.1.1` is retained in
+runtime. The Apache 2.0 text distributed with the Qwen inference code is retained in
 [`licenses/qwen3-tts-Apache-2.0.txt`](licenses/qwen3-tts-Apache-2.0.txt).
+
+## Faster Qwen3-TTS runtime
+
+- Creator: Andres Marafioti
+- Project: [andimarafioti/faster-qwen3-tts](https://github.com/andimarafioti/faster-qwen3-tts)
+- Package: `faster-qwen3-tts==0.4.0`
+- Use: local CUDA-graph acceleration for Qwen synthesis
+- License: MIT
+
+The full MIT text distributed with the package is retained in
+[`licenses/faster-qwen3-tts-MIT.txt`](licenses/faster-qwen3-tts-MIT.txt).
 
 The two large model artifacts are integrity-pinned:
 

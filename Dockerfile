@@ -46,7 +46,7 @@ ARG VCS_REF=unknown
 
 LABEL org.opencontainers.image.title="Vslukh" \
       org.opencontainers.image.description="Local-first Telegram text-to-speech bot" \
-      org.opencontainers.image.licenses="GPL-3.0-or-later AND CC-BY-NC-SA-4.0 AND Apache-2.0" \
+      org.opencontainers.image.licenses="GPL-3.0-or-later AND CC-BY-NC-SA-4.0 AND Apache-2.0 AND MIT" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}"
 
@@ -63,6 +63,7 @@ WORKDIR /app
 COPY --from=build --chown=${APP_UID}:${APP_UID} /app/.venv /app/.venv
 COPY --from=voice --chown=${APP_UID}:${APP_UID} /voice/v5_5_ru.pt /opt/silero/
 COPY LICENSE THIRD_PARTY_NOTICES.md licenses/silero-models-CC-BY-NC-SA-4.0.txt \
+    licenses/faster-qwen3-tts-MIT.txt \
     licenses/qwen3-tts-Apache-2.0.txt \
     /usr/share/doc/vslukh/
 

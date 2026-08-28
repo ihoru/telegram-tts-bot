@@ -1,6 +1,6 @@
 # BotFather launch pack
 
-This is the canonical copy/paste profile for SPEC-0005. Record the final username and
+This is the canonical copy/paste profile retained by SPEC-0008. Record the final username and
 verification date at the bottom; never record the token.
 
 Telegram currently limits display names to 64 characters, usernames to 5-32 Latin

@@ -18,8 +18,10 @@ from telegram_tts_bot.speech.errors import SynthesisError
 from telegram_tts_bot.speech.qwen import (
     LANGUAGE,
     MAX_NEW_TOKENS,
+    MAX_SEQUENCE_LENGTH,
     SEED,
     SPEAKER,
+    WARMUP_PREFILL_LENGTH,
     QwenWaveSynthesizer,
 )
 
@@ -62,9 +64,10 @@ class FakeModel:
         self.calls: list[dict[str, object]] = []
         self.active = 0
         self.max_active = 0
+        self.warmup_calls: list[int] = []
 
-    def get_supported_speakers(self) -> list[str]:
-        return ["aiden", "serena", "vivian"]
+    def warmup(self, prefill_len: int = 100) -> None:
+        self.warmup_calls.append(prefill_len)
 
     def generate_custom_voice(self, **kwargs: object) -> tuple[list[object], int]:
         self.calls.append(kwargs)
@@ -100,11 +103,11 @@ def test_load_verifies_before_import_and_uses_exact_offline_cuda_arguments(
             return model
 
     class QwenModule:
-        Qwen3TTSModel = ModelClass()
+        FasterQwen3TTS = ModelClass()
 
     def import_module(name: str) -> object:
         events.append(("import", name))
-        if name == "qwen_tts":
+        if name == "faster_qwen3_tts":
             print("optional upstream notice")
         return torch_module if name == "torch" else QwenModule()
 
@@ -124,13 +127,20 @@ def test_load_verifies_before_import_and_uses_exact_offline_cuda_arguments(
     assert events == [
         ("verify", tmp_path / "model"),
         ("import", "torch"),
-        ("import", "qwen_tts"),
+        ("import", "faster_qwen3_tts"),
         (
             "load",
             str(tmp_path / "model"),
-            {"device_map": "cuda:0", "dtype": torch_module.bfloat16, "local_files_only": True},
+            {
+                "device": "cuda:0",
+                "dtype": torch_module.bfloat16,
+                "attn_implementation": "sdpa",
+                "max_seq_len": MAX_SEQUENCE_LENGTH,
+                "local_files_only": True,
+            },
         ),
     ]
+    assert model.warmup_calls == [WARMUP_PREFILL_LENGTH]
     assert all(os.environ[name] == "1" for name in qwen._OFFLINE_ENVIRONMENT)
     assert not (tmp_path / ":memory:.ses").exists()
     assert capsys.readouterr().out == ""

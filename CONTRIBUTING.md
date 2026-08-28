@@ -32,6 +32,11 @@ uv sync --locked --all-groups
 uv run pre-commit install
 ```
 
+For a one-time in-place migration from the former `qwen-tts` distribution, run
+`uv sync --locked --all-groups --reinstall-package qwen-tts-hf`. Both distributions
+provide the same `qwen_tts` import path, so uninstalling the former package can remove
+files installed by its replacement. Fresh environments use the ordinary sync command.
+
 Unit tests use fakes and do not need real models. Provision only the provider needed for
 integration work. Qwen provisioning reports human-readable per-file download sizes on
 stderr and handles Ctrl+C with exit status 130 and staging cleanup:

@@ -18,6 +18,7 @@ runtime assets, and are excluded from Python packages and container images.
 | Piper 1.7.0 | Dmitri, Irina | Auditioned; rejected |
 | Silero `v5_5_ru` | Kseniya, Xenia, Baya | Retained as selectable Russian-first voices |
 | Silero `v5_5_ru` | Aidar, Eugene | Auditioned; rejected |
-| Qwen3-TTS 0.6B CustomVoice | Aiden | Selected as the current default |
+| Qwen3-TTS 0.6B CustomVoice, `qwen-tts 0.1.1` | Aiden | Former default runtime result; retained as history |
 | Qwen3-TTS 0.6B CustomVoice | Serena | Retained as a selectable Qwen voice |
 | Qwen3-TTS 0.6B CustomVoice | Vivian | Auditioned; rejected |
+| Qwen3-TTS 0.6B CustomVoice, `faster-qwen3-tts 0.4.0` | Aiden | Current default runtime result |

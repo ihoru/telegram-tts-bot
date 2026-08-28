@@ -257,8 +257,11 @@
       "duration_seconds": 12.4,
       "rendered_at": "2026-08-28T11:18:12+04:00",
       "auditioned_on": "2026-08-28",
-      "decision": "default",
-      "decision_history": [{"date": "2026-08-28", "decision": "default", "reason": "Selected for the best mixed Russian-English result and implemented as the SPEC-0005 default."}]
+      "decision": "removed",
+      "decision_history": [
+        {"date": "2026-08-28", "decision": "default", "reason": "Selected for the best mixed Russian-English result and implemented as the SPEC-0005 default."},
+        {"date": "2026-08-28", "decision": "removed", "reason": "Replaced as the production runtime result by the faster CUDA-graph implementation under SPEC-0008; retained as immutable historical evidence."}
+      ]
     },
     {
       "id": "qwen3-tts-0.6b-customvoice-serena",
@@ -314,6 +317,32 @@
       "auditioned_on": "2026-08-28",
       "decision": "rejected",
       "decision_history": [{"date": "2026-08-28", "decision": "rejected", "reason": "Not selected after the comparative audition."}]
+    },
+    {
+      "id": "qwen3-tts-0.6b-customvoice-aiden-faster-0.4.0",
+      "engine": "Qwen3-TTS",
+      "engine_version": "faster-qwen3-tts 0.4.0",
+      "runtime": "faster-qwen3-tts 0.4.0; qwen-tts-hf 0.1.1.post1; transformers 5.16.1; torch 2.13.0+cu130; Python 3.14.6",
+      "adapter_revision": "sha256:31b1f5520507ee3e329584cdcfafe240599f97c1e19f24b4c5b3dbf564c1df54",
+      "model": "Qwen3-TTS-12Hz-0.6B-CustomVoice",
+      "model_revision": "85e237c12c027371202489a0ec509ded67b5e4b5",
+      "model_sha256": "bc3c7e785eb961179c25450d1acff03f839e0002f2f3a5aeb67b5735c0fa2adb",
+      "speech_tokenizer_sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
+      "source": "https://github.com/andimarafioti/faster-qwen3-tts/tree/v0.4.0",
+      "license": "MIT; Qwen model and compatibility inference code Apache-2.0",
+      "speaker": "Aiden",
+      "language": "Auto",
+      "settings": {"instruct": "", "seed": 20260828, "max_new_tokens": 2048, "max_seq_len": 2048, "warmup_prefill_len": 100, "attn_implementation": "sdpa", "dtype": "bfloat16", "device": "cuda:0", "max_chunk_codepoints": 500},
+      "path": "results/qwen3-tts-0.6b-customvoice-85e237c1-faster-0.4.0/aiden.wav",
+      "sha256": "507c0c72ae29419db3d98896c2a2ad8eb2c27200cb3c0e86e68bd7effbd60c1f",
+      "bytes": 495404,
+      "sample_rate_hz": 24000,
+      "frames": 247680,
+      "duration_seconds": 10.32,
+      "rendered_at": "2026-08-28T17:10:49+04:00",
+      "auditioned_on": "2026-08-28",
+      "decision": "default",
+      "decision_history": [{"date": "2026-08-28", "decision": "default", "reason": "Selected as the accelerated production result under SPEC-0008 after a deterministic 2.12x real-host speedup over the official sequential runtime."}]
     }
   ]
 }

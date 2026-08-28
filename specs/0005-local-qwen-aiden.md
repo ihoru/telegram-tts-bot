@@ -1,10 +1,11 @@
 ---
 id: "0005"
 title: Local Qwen Aiden and Serena with Silero fallback voices
-status: accepted
+status: superseded
 created: 2026-08-28
 updated: 2026-08-28
 supersedes: "0004"
+superseded_by: "0008"
 ---
 
 # SPEC-0005: Local Qwen Aiden and Serena with Silero fallback voices

@@ -11,7 +11,7 @@ OGG/Opus Telegram voice note; the bot keeps no message or audio history.
 The repository is deliberately narrow and operationally complete: Python 3.14, uv,
 Ruff, strict mypy, pytest with branch coverage, pre-commit, a non-root container, and
 SHA-pinned GitHub Actions. The accepted behavior is defined by
-[SPEC-0005](specs/0005-local-qwen-aiden.md).
+[SPEC-0008](specs/0008-faster-qwen-runtime.md).
 
 ## What it does
 
@@ -57,6 +57,15 @@ hook:
 uv sync --locked --all-groups
 uv run pre-commit install
 ```
+
+When upgrading an existing checkout from the former `qwen-tts` distribution, repair
+their shared `qwen_tts` import after the first sync:
+
+```bash
+uv sync --locked --all-groups --reinstall-package qwen-tts-hf
+```
+
+Fresh environments need only the ordinary sync command above.
 
 Provision the exact pinned Qwen snapshot into the ignored local model directory. This
 downloads roughly 2.5 GB once, shows per-file progress with KiB/MiB/GiB units on stderr,
@@ -143,10 +152,11 @@ are intended for mixed Russian-English messages. The shared snapshot is loaded o
 retained, while Latin letters are deterministically transliterated and digits are read
 individually.
 
-The exact mixed-language prompt and all 11 historical Piper, Silero, and Qwen audition
+The exact mixed-language prompt and all 12 historical Piper, Silero, and Qwen audition
 WAVs are in [the chronological audition archive](auditions/README.md). Qwen code and
-weights are Apache-2.0. The bundled Silero model is CC BY-NC-SA 4.0 and limited to
-NonCommercial use; see [Third-party notices](THIRD_PARTY_NOTICES.md).
+weights are Apache-2.0, and the accelerated CUDA-graph runtime is MIT. The bundled
+Silero model is CC BY-NC-SA 4.0 and limited to NonCommercial use; see
+[Third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## TTS command
 
@@ -168,20 +178,16 @@ The command:
 - prints only the resolved output path on stdout after success.
 
 Qwen processes long input sequentially in chunks of at most 500 Unicode characters.
-For example, 1,304 characters require three model generations and can take several
-minutes without FlashAttention; the stderr chunk counter distinguishes this from a
-stalled process. The upstream messages about missing FlashAttention, missing SoX, and
-setting `pad_token_id` are warnings rather than a 1,000-character rejection. Install
-SoX for the supported local stack; FlashAttention remains an optional acceleration.
+The CUDA-graph runtime performs a one-time warmup during model loading, then reports each
+chunk on stderr so a long render does not look stalled. On the reference RTX 2000 Ada
+8 GiB GPU, the exact 1,304-character, three-chunk test took 50.79 seconds with 3.40 GiB
+peak reserved VRAM. The former official sequential runtime took 100.47 seconds with
+3.45 GiB. The accelerated output is deterministic for the fixed seed but differs from
+the former runtime, so both versions are retained in the audition archive.
 
-The official API also supports batching. On the reference RTX 2000 Ada 8 GiB GPU, the
-same three chunks took 100.47 seconds sequentially and 43.95 seconds as one batch, while
-reserved VRAM rose from 3.45 GiB to 5.12 GiB. Batching changed the seeded waveforms and
-reduced their combined duration from 110.56 to 93.84 seconds, so the production adapter
-keeps the quality-accepted sequential behavior until the batched output is auditioned.
-The current runtime already selects PyTorch SDPA. Official FlashAttention 2 or a faster
-GPU are the remaining ways to reduce latency without changing the chunk contract;
-FlashAttention requires a compatible CUDA build environment and is not bundled.
+The runtime uses PyTorch SDPA and manual CUDA graph capture. FlashAttention, chunk
+batching, partial streaming, and parallel generation are not part of the supported
+production path.
 
 Exit status is `0` for success, `2` for usage/input/path errors, `1` for model, FFmpeg,
 synthesis, or write failures, and `130` for interruption.
@@ -295,7 +301,8 @@ ffprobe -version
 
 Delete only the affected ignored model directory and rerun its explicit provisioning
 helper. Never substitute an unverified file or add an unlisted file to the Qwen
-snapshot. Canonical sources and hashes live in SPEC-0005.
+snapshot. Canonical sources and hashes live in SPEC-0008 and its superseded SPEC-0005
+model-selection contract.
 
 ### Telegram reports a polling conflict
 
