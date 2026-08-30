@@ -32,6 +32,8 @@ Statuses are `draft`, `accepted`, `implemented`, `rejected`, and `superseded`.
 | 0007 | Visible local Qwen provisioning and render progress | accepted | - |
 | 0008 | Faster Qwen CUDA-graph runtime | accepted | - |
 | 0009 | Qwen punctuation and CLI ergonomics | accepted | - |
+| 0010 | Bounded fair rendering queue and aggregated progress | accepted | - |
+| 0011 | Privacy-policy link in bot copy | accepted | - |
 
 `BOTFATHER.md` contains the operational profile pack accepted by the current numbered
 specification. Changes to that pack require a new numbered specification.

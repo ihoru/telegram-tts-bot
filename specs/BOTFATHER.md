@@ -70,7 +70,7 @@ I turn text into Telegram voice notes. Russian is strongest; English quality dep
 The public page contains the full policy in Russian and English:
 
 ```text
-https://vslukh-privacy.ihoruru.chatgpt.site
+https://telegram-tts-bot.iho.su/
 ```
 
 ## Commands
@@ -103,6 +103,8 @@ Russian:
 Озвучивание выполняется локально. Я не сохраняю сообщения и созданное аудио.
 
 /help — подробная справка
+
+Политика конфиденциальности: http://telegram-tts-bot.iho.su/
 ```
 
 English:
@@ -117,6 +119,8 @@ Send me text or forward a text message, and I will reply with a ready-to-play vo
 Speech is generated locally. I do not store messages or generated audio.
 
 /help — detailed help
+
+Privacy policy: http://telegram-tts-bot.iho.su/
 ```
 
 ## Runtime copy
@@ -136,6 +140,8 @@ Russian:
 
 /start — показать приветствие
 /help — показать эту справку
+
+Политика конфиденциальности: http://telegram-tts-bot.iho.su/
 ```
 
 English:
@@ -151,6 +157,8 @@ The bot works only in private chats. It is strongest in Russian; the quality of 
 
 /start — show the welcome message
 /help — show this help
+
+Privacy policy: http://telegram-tts-bot.iho.su/
 ```
 
 ## Avatar

@@ -127,7 +127,8 @@ def test_start_and_help_copy_match_the_accepted_profile() -> None:
         "Отправьте мне текст или перешлите текстовое сообщение — я отвечу готовой "
         "голосовой заметкой.\n\n"
         "Озвучивание выполняется локально. Я не сохраняю сообщения и созданное аудио.\n\n"
-        "/help — подробная справка"
+        "/help — подробная справка\n\n"
+        "Политика конфиденциальности: http://telegram-tts-bot.iho.su/"
     )
     assert message_text(Locale.EN, MessageKey.START) == (
         "Hello! I am Vslukh.\n\n"
@@ -137,7 +138,40 @@ def test_start_and_help_copy_match_the_accepted_profile() -> None:
         "Send me text or forward a text message, and I will reply with a ready-to-play "
         "voice note.\n\n"
         "Speech is generated locally. I do not store messages or generated audio.\n\n"
-        "/help — detailed help"
+        "/help — detailed help\n\n"
+        "Privacy policy: http://telegram-tts-bot.iho.su/"
     )
     assert "данных пересылки" in message_text(Locale.RU, MessageKey.HELP)
     assert "forwarding details" in message_text(Locale.EN, MessageKey.HELP)
+    assert "ограниченной очереди" in message_text(Locale.RU, MessageKey.HELP)
+    assert "bounded queue" in message_text(Locale.EN, MessageKey.HELP)
+    assert message_text(Locale.RU, MessageKey.HELP).endswith(
+        "Политика конфиденциальности: http://telegram-tts-bot.iho.su/"
+    )
+    assert message_text(Locale.EN, MessageKey.HELP).endswith(
+        "Privacy policy: http://telegram-tts-bot.iho.su/"
+    )
+
+
+def test_privacy_policy_link_only_appears_in_informational_commands() -> None:
+    informational_keys = {MessageKey.START, MessageKey.HELP}
+    for locale in Locale:
+        for key in MessageKey:
+            assert ("http://telegram-tts-bot.iho.su/" in message_text(locale, key)) is (
+                key in informational_keys
+            )
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        MessageKey.GLOBAL_QUEUE_FULL,
+        MessageKey.USER_QUEUE_FULL,
+        MessageKey.QUEUE_WAIT,
+        MessageKey.QUEUE_EXPIRED,
+        MessageKey.RESTARTING,
+    ],
+)
+def test_queue_messages_exist_in_both_locales(key: MessageKey) -> None:
+    assert message_text(Locale.RU, key)
+    assert message_text(Locale.EN, key)
