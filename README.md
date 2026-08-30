@@ -230,6 +230,10 @@ behavior, not Telegram's own retention.
 
 ## Docker
 
+For a persistent server installation, including CPU-only and NVIDIA GPU procedures,
+secret handling, automatic restarts, verification, and upgrades, see
+[the deployment guide](DEPLOYMENT.md).
+
 Build the final amd64 image:
 
 ```bash
