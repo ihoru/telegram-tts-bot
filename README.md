@@ -4,14 +4,29 @@
   <img src="assets/vslukh-avatar.png" alt="Vslukh logo" width="180">
 </p>
 
-Vslukh is a small, local-first Telegram bot that turns regular and forwarded text into
-voice notes. Speech is generated on the host with Qwen3-TTS or Silero and returned as an
-OGG/Opus Telegram voice note; the bot keeps no message or audio history.
+[![CI](https://github.com/ihoru/telegram-tts-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/ihoru/telegram-tts-bot/actions/workflows/ci.yml)
 
-The repository is deliberately narrow and operationally complete: Python 3.14, uv,
-Ruff, strict mypy, pytest with branch coverage, pre-commit, a non-root container, and
-SHA-pinned GitHub Actions. The accepted behavior is defined by
-[SPEC-0008](specs/0008-faster-qwen-runtime.md).
+[Try the bot](https://t.me/TextToVoiceRuBot) ·
+[Deployment guide](DEPLOYMENT.md) ·
+[Privacy policy](https://telegram-tts-bot.iho.su/)
+
+Vslukh is a deployed, local-first Telegram bot that turns regular and forwarded text
+into voice notes. It runs Qwen3-TTS or Silero on the host, returns Telegram-ready
+OGG/Opus audio, and keeps no message or generated-audio history.
+
+This is a production-oriented Python service rather than a model demo: it includes a
+typed and tested rendering boundary, explicit overload control, reproducible model
+provisioning, a non-root GPU-capable container, and release automation with provenance
+and SBOM generation.
+
+## Engineering highlights
+
+- One rendering interface supports both GPU-backed Qwen and CPU-friendly Silero.
+- Telegram handlers and the CLI share the same deterministic OGG/Opus pipeline.
+- Global and per-user admission control reject overload without hiding work in a queue.
+- CI covers linting, strict typing, unit tests, packaging, and real-model containers.
+- Model hashes, third-party licenses, deployment requirements, and privacy boundaries
+  are documented explicitly.
 
 ## What it does
 
