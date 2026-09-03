@@ -39,11 +39,12 @@ class MessageKey(StrEnum):
 _RU_MESSAGES: Final = MappingProxyType({
     MessageKey.START: (
         "Привет! Это Read Aloud.\n\n"
-        "Я превращаю обычные и пересланные текстовые сообщения в голосовые заметки. "
+        "Я превращаю обычные и пересланные текстовые сообщения, включая подписи к "
+        "медиа, в голосовые заметки. "
         "В зависимости от настроенного голоса бот также может естественно читать "  # ruff: ignore[ambiguous-unicode-character-string]
         "английские слова и фразы.\n\n"
-        "Отправьте мне текст или перешлите текстовое сообщение — я отвечу готовой "
-        "голосовой заметкой.\n\n"
+        "Отправьте мне текст или медиа с подписью — я отвечу готовой голосовой "  # ruff: ignore[ambiguous-unicode-character-string]
+        "заметкой.\n\n"
         "Озвучивание выполняется локально. Я не сохраняю сообщения и созданное аудио.\n\n"
         "/help — подробная справка\n\n" + _RU_PRIVACY_POLICY_LINE
     ),
@@ -51,10 +52,12 @@ _RU_MESSAGES: Final = MappingProxyType({
         "Как пользоваться:\n\n"
         "• Отправьте обычное текстовое сообщение.\n"
         "• Или перешлите текстовое сообщение из другого чата.\n"
+        "• Текст в подписи к фото, видео или файлу тоже можно озвучить.\n"
         "• Получите голосовую заметку в ответ.\n\n"
         "Бот работает только в личном чате. Лучше всего он работает с русским текстом; "  # ruff: ignore[ambiguous-unicode-character-string]
         "качество английских слов и фраз зависит от настроенного голоса. "
-        "Озвучивается только текст сообщения, без имени автора и данных пересылки. "
+        "Озвучивается только текст сообщения или подписи, без самого медиа, имени "
+        "автора и данных пересылки. "
         "Сообщения и готовое аудио не сохраняются. Если бот занят, запросы ожидают "
         "в ограниченной очереди.\n\n"
         "/start — показать приветствие\n"
@@ -84,7 +87,8 @@ _RU_MESSAGES: Final = MappingProxyType({
         "Пожалуйста, отправьте их снова немного позже."
     ),
     MessageKey.UNSUPPORTED: (
-        "Отправьте обычный текст или перешлите текстовое сообщение — я отвечу голосовой заметкой."
+        "Отправьте текстовое сообщение или медиа с текстовой подписью — я отвечу "  # ruff: ignore[ambiguous-unicode-character-string]
+        "голосовой заметкой."
     ),
     MessageKey.EMPTY_TEXT: "Сообщение должно содержать текст.",
     MessageKey.TEXT_TOO_LONG: "Текст слишком длинный. Максимум — 4096 символов.",
@@ -96,10 +100,11 @@ _RU_MESSAGES: Final = MappingProxyType({
 _EN_MESSAGES: Final = MappingProxyType({
     MessageKey.START: (
         "Hi! This is Read Aloud.\n\n"
-        "I turn regular and forwarded text messages into voice notes. Depending on "
+        "I turn regular and forwarded text messages, including media captions, into "
+        "voice notes. Depending on "
         "the configured voice, the bot can also read English words and phrases "
         "naturally.\n\n"
-        "Send me text or forward a text message, and I will reply with a ready-to-play "
+        "Send me text or media with a caption, and I will reply with a ready-to-play "
         "voice note.\n\n"
         "Speech is generated locally. I do not store messages or generated audio.\n\n"
         "/help — detailed help\n\n" + _EN_PRIVACY_POLICY_LINE
@@ -108,10 +113,12 @@ _EN_MESSAGES: Final = MappingProxyType({
         "How to use the bot:\n\n"
         "• Send a regular text message.\n"
         "• Or forward a text message from another chat.\n"
+        "• Text in a photo, video, or file caption can be voiced too.\n"
         "• Receive a voice note in reply.\n\n"
         "The bot works only in private chats. It is strongest in Russian; the quality "
         "of English words and phrases depends on the configured voice. "
-        "It reads only the message text, not the author name or forwarding details. "
+        "It reads only the message text or caption, not the media, author name, or "
+        "forwarding details. "
         "Messages and generated audio are not stored. If the bot is busy, requests "
         "wait in a bounded queue.\n\n"
         "/start — show the welcome message\n"
@@ -139,7 +146,7 @@ _EN_MESSAGES: Final = MappingProxyType({
         "again in a little while."
     ),
     MessageKey.UNSUPPORTED: (
-        "Send a regular text message or forward a text message and I will reply with a voice note."
+        "Send a text message or media with a text caption and I will reply with a voice note."
     ),
     MessageKey.EMPTY_TEXT: "The message must contain text.",
     MessageKey.TEXT_TOO_LONG: "The text is too long. The maximum is 4,096 characters.",

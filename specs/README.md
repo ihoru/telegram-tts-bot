@@ -34,6 +34,12 @@ Statuses are `draft`, `accepted`, `implemented`, `rejected`, and `superseded`.
 | 0009 | Qwen punctuation and CLI ergonomics | accepted | - |
 | 0010 | Bounded fair rendering queue and aggregated progress | accepted | - |
 | 0011 | Privacy-policy link in bot copy | accepted | - |
+| 0012 | Reliable Telegram voice delivery | draft | - |
+| 0013 | User cancellation of queued speech | draft | - |
+| 0014 | Renderer failure supervision | draft | - |
+| 0015 | Visible active-render progress | draft | - |
+| 0016 | Per-user voice and speed profiles | draft | - |
+| 0017 | Rich text and media-caption input | accepted | - |
 | 0018 | Debug incoming update and handler logging | accepted | - |
 | 0019 | Read Aloud rebrand | accepted | - |
 

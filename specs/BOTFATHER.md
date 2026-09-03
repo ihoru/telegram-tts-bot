@@ -32,13 +32,13 @@ brand reference.
 Russian:
 
 ```text
-Озвучиваю обычные и пересланные тексты локально. Этот бот не сохраняет сообщения и аудио.
+Озвучиваю текст и подписи к медиа локально. Этот бот не сохраняет сообщения и аудио.
 ```
 
 English:
 
 ```text
-Turns regular and forwarded text into voice notes. Local synthesis; this bot stores no messages or audio.
+Turns text and media captions into voice notes. Local synthesis; this bot stores no messages or audio.
 ```
 
 ## Full description
@@ -46,13 +46,13 @@ Turns regular and forwarded text into voice notes. Local synthesis; this bot sto
 Russian:
 
 ```text
-Read Aloud превращает текст в голосовые сообщения прямо в Telegram. Лучше всего бот работает с русским текстом; качество английских слов и фраз зависит от настроенного голоса. Озвучивание выполняется локально; бот не хранит сообщения или аудио.
+Отправьте или перешлите текст либо добавьте подпись к медиа, и Read Aloud вернет голосовую заметку в Telegram. Лучше всего бот работает с русским текстом; качество английской речи зависит от настроенного голоса. Озвучивание выполняется локально; бот не хранит сообщения и аудио.
 ```
 
 English:
 
 ```text
-Read Aloud turns text into Telegram voice notes. Russian is strongest; English quality depends on the configured voice. Send or forward text and the bot will return ready-to-play audio. Speech generation runs locally; the bot stores neither messages nor audio.
+Send or forward text, or add a caption to media, and Read Aloud will return a Telegram voice note. Russian is strongest; English quality depends on the configured voice. Speech is generated locally, and the bot stores neither messages nor audio.
 ```
 
 ## Privacy policy
@@ -86,9 +86,9 @@ Russian:
 ```text
 Привет! Это Read Aloud.
 
-Я превращаю обычные и пересланные текстовые сообщения в голосовые заметки. В зависимости от настроенного голоса бот также может естественно читать английские слова и фразы.
+Я превращаю обычные и пересланные текстовые сообщения, включая подписи к медиа, в голосовые заметки. В зависимости от настроенного голоса бот также может естественно читать английские слова и фразы.
 
-Отправьте мне текст или перешлите текстовое сообщение — я отвечу готовой голосовой заметкой.
+Отправьте мне текст или медиа с подписью — я отвечу готовой голосовой заметкой.
 
 Озвучивание выполняется локально. Я не сохраняю сообщения и созданное аудио.
 
@@ -102,9 +102,9 @@ English:
 ```text
 Hi! This is Read Aloud.
 
-I turn regular and forwarded text messages into voice notes. Depending on the configured voice, the bot can also read English words and phrases naturally.
+I turn regular and forwarded text messages, including media captions, into voice notes. Depending on the configured voice, the bot can also read English words and phrases naturally.
 
-Send me text or forward a text message, and I will reply with a ready-to-play voice note.
+Send me text or media with a caption, and I will reply with a ready-to-play voice note.
 
 Speech is generated locally. I do not store messages or generated audio.
 
@@ -124,9 +124,10 @@ Russian:
 
 • Отправьте обычное текстовое сообщение.
 • Или перешлите текстовое сообщение из другого чата.
+• Текст в подписи к фото, видео или файлу тоже можно озвучить.
 • Получите голосовую заметку в ответ.
 
-Бот работает только в личном чате. Лучше всего он работает с русским текстом; качество английских слов и фраз зависит от настроенного голоса. Озвучивается только текст сообщения, без имени автора и данных пересылки. Сообщения и готовое аудио не сохраняются. Если бот занят, попробуйте снова позже.
+Бот работает только в личном чате. Лучше всего он работает с русским текстом; качество английских слов и фраз зависит от настроенного голоса. Озвучивается только текст сообщения или подписи, без самого медиа, имени автора и данных пересылки. Сообщения и готовое аудио не сохраняются. Если бот занят, попробуйте снова позже.
 
 /start — показать приветствие
 /help — показать эту справку
@@ -141,9 +142,10 @@ How to use the bot:
 
 • Send a regular text message.
 • Or forward a text message from another chat.
+• Text in a photo, video, or file caption can be voiced too.
 • Receive a voice note in reply.
 
-The bot works only in private chats. It is strongest in Russian; the quality of English words and phrases depends on the configured voice. It reads only the message text, not the author name or forwarding details. Messages and generated audio are not stored. If the bot is busy, try again later.
+The bot works only in private chats. It is strongest in Russian; the quality of English words and phrases depends on the configured voice. It reads only the message text or caption, not the media, author name, or forwarding details. Messages and generated audio are not stored. If the bot is busy, try again later.
 
 /start — show the welcome message
 /help — show this help

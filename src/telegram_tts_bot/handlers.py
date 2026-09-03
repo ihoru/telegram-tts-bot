@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping
 
 from aiogram import Router
 from aiogram.enums import ChatAction, ChatType
@@ -23,6 +24,16 @@ from telegram_tts_bot.localization import (
 
 MAX_TELEGRAM_TEXT_LENGTH = 4096
 
+_RICH_TEXT_FIELDS = frozenset({
+    "alternative_text",
+    "caption",
+    "credit",
+    "expression",
+    "summary",
+    "text",
+})
+_RICH_CONTAINER_FIELDS = frozenset({"blocks", "cells", "items"})
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,10 +45,49 @@ class PrivateChatFilter(Filter):
 
 
 class TextMessageFilter(Filter):
-    """Select messages with text, including forwarded and copied text."""
+    """Select messages with text or a media caption."""
 
     async def __call__(self, message: Message) -> bool:
-        return message.text is not None
+        return _text_to_speak(message) is not None
+
+
+def _text_to_speak(message: Message) -> str | None:
+    """Return Telegram's plain text representation of supported message content."""
+    if message.text is not None:
+        return message.text
+    if message.caption is not None:
+        return message.caption
+    if message.rich_message is None:
+        return None
+    return _flatten_rich_value(message.rich_message.model_dump(exclude_none=True))
+
+
+def _flatten_rich_value(value: object, *, sequence_separator: str = "\n") -> str | None:
+    """Flatten human-visible rich-message fields without narrating metadata."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        sequence_parts = [
+            part
+            for item in value
+            if (part := _flatten_rich_value(item, sequence_separator=sequence_separator))
+            is not None
+        ]
+        return sequence_separator.join(sequence_parts) if sequence_parts else None
+    if not isinstance(value, Mapping):
+        return None
+
+    parts: list[str] = []
+    for key, item in value.items():
+        if key in _RICH_TEXT_FIELDS:
+            part = _flatten_rich_value(item, sequence_separator="")
+        elif key in _RICH_CONTAINER_FIELDS:
+            part = _flatten_rich_value(item)
+        else:
+            continue
+        if part is not None:
+            parts.append(part)
+    return "\n".join(parts) if parts else None
 
 
 def create_router() -> Router:
@@ -74,8 +124,8 @@ async def handle_text(
     event_from_user: User,
     speech_service: BotSpeechService,
 ) -> None:
-    """Render direct, copied, and forwarded text through the same path."""
-    text = message.text
+    """Render direct, copied, forwarded, and caption text through the same path."""
+    text = _text_to_speak(message)
     if text is None:
         return
     locale = locale_for_language_code(event_from_user.language_code)
@@ -127,7 +177,7 @@ async def handle_text(
 
 
 async def handle_unsupported(message: Message, event_from_user: User) -> None:
-    """Explain the text-only contract for media, including forwarded captions."""
+    """Explain the textual-content contract for messages without text or captions."""
     locale = locale_for_language_code(event_from_user.language_code)
     await _safe_reply(message, message_text(locale, MessageKey.UNSUPPORTED), "unsupported")
 

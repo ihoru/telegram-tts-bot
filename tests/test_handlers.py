@@ -193,15 +193,15 @@ async def test_invalid_bot_text_is_rejected_before_rendering(text: str, key: Mes
     assert message.replies == [message_text(Locale.EN, key)]
 
 
-async def test_unsupported_caption_gets_guidance_without_rendering() -> None:
-    message = FakeMessage(text=None, caption="forwarded caption", forward_origin="visible-user")
+async def test_unsupported_content_without_text_gets_guidance() -> None:
+    message = FakeMessage()
 
     await handle_unsupported(as_message(message), as_user(FakeUser(language_code="ru")))
 
     assert message.replies == [message_text(Locale.RU, MessageKey.UNSUPPORTED)]
 
 
-async def test_private_and_text_filters_ignore_group_and_caption_content() -> None:
+async def test_private_and_text_filters_ignore_groups_and_accept_text_content() -> None:
     private_text = Message(
         message_id=1,
         date=MESSAGE_DATE,
@@ -224,11 +224,43 @@ async def test_private_and_text_filters_ignore_group_and_caption_content() -> No
     assert await PrivateChatFilter()(private_text)
     assert not await PrivateChatFilter()(group_text)
     assert await TextMessageFilter()(private_text)
-    assert not await TextMessageFilter()(private_caption)
+    assert await TextMessageFilter()(private_caption)
 
 
+@pytest.mark.parametrize(
+    ("content", "expected_text"),
+    [
+        ({"text": "Прочитай это"}, "Прочитай это"),
+        ({"caption": "Озвучь эту подпись"}, "Озвучь эту подпись"),
+        (
+            {
+                "rich_message": {
+                    "blocks": [
+                        {
+                            "type": "list",
+                            "items": [
+                                {
+                                    "label": "•",
+                                    "blocks": [
+                                        {
+                                            "type": "paragraph",
+                                            "text": "Озвучь этот структурированный текст",
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+            "Озвучь этот структурированный текст",
+        ),
+    ],
+)
 async def test_dispatcher_routes_real_private_message_model(
     monkeypatch: pytest.MonkeyPatch,
+    content: dict[str, Any],
+    expected_text: str,
 ) -> None:
     service = StubSpeechService(RenderedVoice(VoiceAudio(b"ogg")))
     dispatcher = create_dispatcher(as_service(service), HandlerActivity())
@@ -247,20 +279,23 @@ async def test_dispatcher_routes_real_private_message_model(
     monkeypatch.setattr(Bot, "send_chat_action", capture_chat_action)
     monkeypatch.setattr(Message, "reply_voice", capture_voice)
     bot = Bot(token="123456:local-test-token")
-    update = Update(
-        update_id=1,
-        message=Message(
-            message_id=10,
-            date=MESSAGE_DATE,
-            chat=Chat(id=88, type=ChatType.PRIVATE),
-            from_user=User(
-                id=88,
-                is_bot=False,
-                first_name="Test",
-                language_code="en",
-            ),
-            text="Прочитай это",
-        ),
+    update = Update.model_validate(
+        {
+            "update_id": 1,
+            "message": {
+                "message_id": 10,
+                "date": MESSAGE_DATE,
+                "chat": {"id": 88, "type": ChatType.PRIVATE},
+                "from": {
+                    "id": 88,
+                    "is_bot": False,
+                    "first_name": "Test",
+                    "language_code": "en",
+                },
+                **content,
+            },
+        },
+        context={"bot": bot},
     )
 
     try:
@@ -268,7 +303,7 @@ async def test_dispatcher_routes_real_private_message_model(
     finally:
         await bot.session.close()
 
-    assert service.calls == [(88, "Прочитай это")]
+    assert service.calls == [(88, expected_text)]
     assert sent_actions == [(88, ChatAction.RECORD_VOICE)]
     assert [voice.data for voice in sent_voices] == [b"ogg"]
 
