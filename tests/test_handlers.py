@@ -469,6 +469,66 @@ async def test_dispatcher_routes_real_private_message_model(
     assert sent_voices == [(88, "Qwen3-TTS (aiden) · render 5.123 s · queue 2.417 s")]
 
 
+async def test_concurrent_dispatch_preserves_message_order_during_admission(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = StubSpeechService(StubJob(rendered()))
+    dispatcher = create_dispatcher(
+        as_service(service),
+        HandlerActivity(),
+        as_progress(StubProgress()),
+        PRESENTATION,
+    )
+    first_reached_filter = asyncio.Event()
+    release_first = asyncio.Event()
+    original_filter = TextMessageFilter.__call__
+
+    async def delayed_first_filter(self: TextMessageFilter, message: Message) -> bool:
+        if message.message_id == 10:
+            first_reached_filter.set()
+            await release_first.wait()
+        return await original_filter(self, message)
+
+    async def ignore_voice(_bot: Bot, **_kwargs: Any) -> None:
+        await asyncio.sleep(0)
+
+    monkeypatch.setattr(TextMessageFilter, "__call__", delayed_first_filter)
+    monkeypatch.setattr(Bot, "send_voice", ignore_voice)
+    bot = Bot(token="123456:local-test-token")
+
+    def make_update(update_id: int, message_id: int, text: str) -> Update:
+        return Update.model_validate(
+            {
+                "update_id": update_id,
+                "message": {
+                    "message_id": message_id,
+                    "date": MESSAGE_DATE,
+                    "chat": {"id": 88, "type": ChatType.PRIVATE},
+                    "from": {
+                        "id": 88,
+                        "is_bot": False,
+                        "first_name": "Test",
+                        "language_code": "en",
+                    },
+                    "text": text,
+                },
+            },
+            context={"bot": bot},
+        )
+
+    try:
+        first = asyncio.create_task(dispatcher.feed_update(bot, make_update(1, 10, "first")))
+        await first_reached_filter.wait()
+        second = asyncio.create_task(dispatcher.feed_update(bot, make_update(2, 11, "second")))
+        await asyncio.sleep(0)
+        release_first.set()
+        await asyncio.gather(first, second)
+    finally:
+        await bot.session.close()
+
+    assert service.calls == [(88, "first"), (88, "second")]
+
+
 async def test_render_failure_logs_only_safe_diagnostics(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

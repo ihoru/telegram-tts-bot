@@ -12,6 +12,7 @@ from aiogram.enums import ChatType, MessageEntityType
 from aiogram.filters import Filter
 from aiogram.types import BufferedInputFile, Message, ReplyParameters, User
 
+from telegram_tts_bot.activity import AdmissionTurn
 from telegram_tts_bot.bot_service import (
     AbortReason,
     BotSpeechService,
@@ -155,8 +156,13 @@ def create_router() -> Router:
     return router
 
 
-async def handle_start(message: Message, event_from_user: User) -> None:
+async def handle_start(
+    message: Message,
+    event_from_user: User,
+    admission_turn: AdmissionTurn | None = None,
+) -> None:
     """Send the localized welcome message."""
+    _release_admission(admission_turn)
     await _safe_answer(
         message,
         message_text(locale_for_language_code(event_from_user.language_code), MessageKey.START),
@@ -164,8 +170,13 @@ async def handle_start(message: Message, event_from_user: User) -> None:
     )
 
 
-async def handle_help(message: Message, event_from_user: User) -> None:
+async def handle_help(
+    message: Message,
+    event_from_user: User,
+    admission_turn: AdmissionTurn | None = None,
+) -> None:
     """Send detailed localized usage help."""
+    _release_admission(admission_turn)
     await _safe_answer(
         message,
         message_text(locale_for_language_code(event_from_user.language_code), MessageKey.HELP),
@@ -179,16 +190,20 @@ async def handle_text(
     speech_service: BotSpeechService,
     progress: TelegramProgressCoordinator,
     voice_presentation: VoicePresentation,
+    admission_turn: AdmissionTurn | None = None,
 ) -> None:
     """Submit supported private text through one bounded queue path."""
     text = _text_to_speak(message)
     if text is None:
+        _release_admission(admission_turn)
         return
     locale = locale_for_language_code(event_from_user.language_code)
     if not text.strip():
+        _release_admission(admission_turn)
         await _safe_reply(message, message_text(locale, MessageKey.EMPTY_TEXT), "empty_text")
         return
     if len(text) > MAX_TELEGRAM_TEXT_LENGTH:
+        _release_admission(admission_turn)
         await _safe_reply(message, message_text(locale, MessageKey.TEXT_TOO_LONG), "text_too_long")
         return
 
@@ -201,7 +216,10 @@ async def handle_text(
     )
     del message, event_from_user
 
-    submission = await speech_service.submit(user_id=user_id, text=text)
+    try:
+        submission = await speech_service.submit(user_id=user_id, text=text)
+    finally:
+        _release_admission(admission_turn)
     del text
     if isinstance(submission, RenderRejected):
         await _reply_to_rejection(
@@ -281,10 +299,20 @@ async def handle_text(
     await _safe_send_voice(target, outcome, voice_presentation.caption(outcome))
 
 
-async def handle_unsupported(message: Message, event_from_user: User) -> None:
+async def handle_unsupported(
+    message: Message,
+    event_from_user: User,
+    admission_turn: AdmissionTurn | None = None,
+) -> None:
     """Explain the textual-content contract for messages without text or captions."""
+    _release_admission(admission_turn)
     locale = locale_for_language_code(event_from_user.language_code)
     await _safe_reply(message, message_text(locale, MessageKey.UNSUPPORTED), "unsupported")
+
+
+def _release_admission(admission_turn: AdmissionTurn | None) -> None:
+    if admission_turn is not None:
+        admission_turn.release()
 
 
 async def _reply_to_rejection(

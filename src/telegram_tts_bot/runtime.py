@@ -13,6 +13,7 @@ from telegram_tts_bot.activity import (
     HandlerActivity,
     HandlerActivityMiddleware,
     HandlerLoggingMiddleware,
+    OrderedAdmissionMiddleware,
     UpdateLoggingMiddleware,
 )
 from telegram_tts_bot.bot_service import BotSpeechService
@@ -49,6 +50,7 @@ def create_dispatcher(
         progress=progress,
         voice_presentation=voice_presentation,
     )
+    dispatcher.update.outer_middleware(OrderedAdmissionMiddleware())
     dispatcher.update.outer_middleware(UpdateLoggingMiddleware())
     dispatcher.update.outer_middleware(HandlerActivityMiddleware(activity))
     router = create_router()
