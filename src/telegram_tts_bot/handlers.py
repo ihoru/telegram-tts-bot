@@ -2,25 +2,31 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-import time
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 from aiogram import Router
-from aiogram.enums import ChatAction, ChatType
-from aiogram.filters import Command, CommandStart, Filter
-from aiogram.types import BufferedInputFile, Message, User
+from aiogram.enums import ChatType, MessageEntityType
+from aiogram.filters import Filter
+from aiogram.types import BufferedInputFile, Message, ReplyParameters, User
 
 from telegram_tts_bot.bot_service import (
+    AbortReason,
     BotSpeechService,
     RejectionReason,
+    RenderAborted,
+    RenderedVoice,
     RenderRejected,
 )
 from telegram_tts_bot.localization import (
+    Locale,
     MessageKey,
     locale_for_language_code,
     message_text,
 )
+from telegram_tts_bot.progress import ReplyTarget, TelegramProgressCoordinator
 
 MAX_TELEGRAM_TEXT_LENGTH = 4096
 
@@ -35,6 +41,22 @@ _RICH_TEXT_FIELDS = frozenset({
 _RICH_CONTAINER_FIELDS = frozenset({"blocks", "cells", "items"})
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class VoicePresentation:
+    """Stable user-facing model and configured voice labels."""
+
+    model_name: str
+    voice_name: str
+
+    def caption(self, rendered: RenderedVoice) -> str:
+        """Format one plain-text Telegram voice caption."""
+        return (
+            f"{self.model_name} ({self.voice_name})"
+            f" · render {rendered.render_duration_seconds:.3f} s"
+            f" · queue {rendered.queue_duration_seconds:.3f} s"
+        )
 
 
 class PrivateChatFilter(Filter):
@@ -90,12 +112,44 @@ def _flatten_rich_value(value: object, *, sequence_separator: str = "\n") -> str
     return "\n".join(parts) if parts else None
 
 
+class _PlainCommandFilter(Filter):
+    """Match only unformatted `/start` and `/help` commands."""
+
+    def __init__(self, command: str):
+        self._command = command
+
+    async def __call__(self, message: Message) -> bool:
+        text = message.text
+        if text is None:
+            return False
+        if not text.startswith("/"):
+            return False
+
+        command_token = text.split(None, 1)[0]
+        command_name = command_token[1:].split("@", 1)[0].lower()
+        if command_name != self._command:
+            return False
+
+        entities = message.entities
+        if not entities:
+            return True
+        if len(entities) != 1:
+            return False
+
+        command_entity = entities[0]
+        return (
+            command_entity.type == MessageEntityType.BOT_COMMAND
+            and command_entity.offset == 0
+            and command_entity.length == len(command_token)
+        )
+
+
 def create_router() -> Router:
     """Create the private-chat-only router in deterministic handler order."""
     router = Router(name=__name__)
     router.message.filter(PrivateChatFilter())
-    router.message.register(handle_start, CommandStart())
-    router.message.register(handle_help, Command("help"))
+    router.message.register(handle_start, _PlainCommandFilter("start"))
+    router.message.register(handle_help, _PlainCommandFilter("help"))
     router.message.register(handle_text, TextMessageFilter())
     router.message.register(handle_unsupported)
     return router
@@ -123,8 +177,10 @@ async def handle_text(
     message: Message,
     event_from_user: User,
     speech_service: BotSpeechService,
+    progress: TelegramProgressCoordinator,
+    voice_presentation: VoicePresentation,
 ) -> None:
-    """Render direct, copied, forwarded, and caption text through the same path."""
+    """Submit supported private text through one bounded queue path."""
     text = _text_to_speak(message)
     if text is None:
         return
@@ -136,44 +192,93 @@ async def handle_text(
         await _safe_reply(message, message_text(locale, MessageKey.TEXT_TOO_LONG), "text_too_long")
         return
 
-    await _safe_record_voice_action(message)
-    render_started = time.perf_counter()
+    user_id = event_from_user.id
+    characters = len(text)
+    target = ReplyTarget(
+        bot=message.bot,
+        chat_id=message.chat.id,
+        message_id=message.message_id,
+    )
+    del message, event_from_user
+
+    submission = await speech_service.submit(user_id=user_id, text=text)
+    del text
+    if isinstance(submission, RenderRejected):
+        await _reply_to_rejection(
+            progress=progress,
+            target=target,
+            user_id=user_id,
+            locale=locale,
+            rejection=submission,
+        )
+        return
+
+    job = submission
+    backlog_id = job.backlog_id
+    if backlog_id is not None:
+        await progress.enter_backlog(
+            user_id=user_id,
+            backlog_id=backlog_id,
+            target=target,
+            text=message_text(locale, MessageKey.QUEUE_WAIT),
+        )
     try:
-        result = await speech_service.try_render(user_id=event_from_user.id, text=text)
+        aborted = await job.wait_started()
+    except asyncio.CancelledError:
+        await speech_service.cancel(job)
+        raise
+    finally:
+        if backlog_id is not None:
+            await progress.leave_backlog(user_id=user_id, backlog_id=backlog_id)
+
+    if aborted is not None:
+        await _reply_to_abort(
+            progress=progress,
+            target=target,
+            user_id=user_id,
+            locale=locale,
+            aborted=aborted,
+        )
+        return
+
+    try:
+        async with progress.rendering(target):
+            outcome = await job.result()
+    except asyncio.CancelledError:
+        await speech_service.cancel(job)
+        raise
     except Exception as error:
         logger.error(
             "speech_render_failed exception_type=%s characters=%d",
             type(error).__name__,
-            len(text),
+            characters,
         )
-        await _safe_reply(message, message_text(locale, MessageKey.RENDER_FAILED), "render_failed")
+        await _safe_target_reply(
+            target,
+            message_text(locale, MessageKey.RENDER_FAILED),
+            response_kind="render_failed",
+        )
         return
 
-    if isinstance(result, RenderRejected):
-        key = (
-            MessageKey.USER_BUSY
-            if result.reason is RejectionReason.USER_CAPACITY
-            else MessageKey.GLOBAL_BUSY
+    if isinstance(outcome, RenderAborted):
+        await _reply_to_abort(
+            progress=progress,
+            target=target,
+            user_id=user_id,
+            locale=locale,
+            aborted=outcome,
         )
-        await _safe_reply(message, message_text(locale, key), result.reason.value)
         return
 
-    render_duration_seconds = time.perf_counter() - render_started
     logger.info(
-        "speech_rendered characters=%d output_bytes=%d render_duration_seconds=%.3f",
-        len(text),
-        len(result.audio.data),
-        render_duration_seconds,
+        "speech_rendered characters=%d output_bytes=%d queue_duration_seconds=%.3f "
+        "render_duration_seconds=%.3f",
+        characters,
+        len(outcome.audio.data),
+        outcome.queue_duration_seconds,
+        outcome.render_duration_seconds,
     )
-    voice = BufferedInputFile(result.audio.data, filename=result.audio.filename)
-    try:
-        await message.reply_voice(voice)
-    except Exception as error:
-        logger.error(
-            "voice_upload_failed exception_type=%s output_bytes=%d",
-            type(error).__name__,
-            len(result.audio.data),
-        )
+    await _safe_send_voice(target, outcome, voice_presentation.caption(outcome))
 
 
 async def handle_unsupported(message: Message, event_from_user: User) -> None:
@@ -182,21 +287,94 @@ async def handle_unsupported(message: Message, event_from_user: User) -> None:
     await _safe_reply(message, message_text(locale, MessageKey.UNSUPPORTED), "unsupported")
 
 
-async def _safe_record_voice_action(message: Message) -> None:
-    bot = message.bot
+async def _reply_to_rejection(
+    *,
+    progress: TelegramProgressCoordinator,
+    target: ReplyTarget,
+    user_id: int,
+    locale: Locale,
+    rejection: RenderRejected,
+) -> None:
+    if rejection.reason is RejectionReason.USER_QUEUE_FULL:
+        key = MessageKey.USER_QUEUE_FULL
+    elif rejection.reason is RejectionReason.GLOBAL_QUEUE_FULL:
+        key = MessageKey.GLOBAL_QUEUE_FULL
+    else:
+        key = MessageKey.RESTARTING
+    await progress.send_coalesced(
+        user_id=user_id,
+        kind=rejection.reason.value,
+        target=target,
+        text=message_text(locale, key),
+    )
+
+
+async def _reply_to_abort(
+    *,
+    progress: TelegramProgressCoordinator,
+    target: ReplyTarget,
+    user_id: int,
+    locale: Locale,
+    aborted: RenderAborted,
+) -> None:
+    key = (
+        MessageKey.QUEUE_EXPIRED if aborted.reason is AbortReason.EXPIRED else MessageKey.RESTARTING
+    )
+    await progress.send_coalesced(
+        user_id=user_id,
+        kind=aborted.reason.value,
+        target=target,
+        text=message_text(locale, key),
+    )
+
+
+async def _safe_send_voice(
+    target: ReplyTarget,
+    rendered: RenderedVoice,
+    caption: str,
+) -> None:
+    bot = target.bot
     if bot is None:
-        logger.warning("chat_action_skipped action=record_voice reason=bot_unbound")
+        logger.error("voice_upload_failed exception_type=BotUnbound")
         return
+    voice = BufferedInputFile(rendered.audio.data, filename=rendered.audio.filename)
     try:
-        await bot.send_chat_action(
-            chat_id=message.chat.id,
-            action=ChatAction.RECORD_VOICE,
+        await bot.send_voice(
+            chat_id=target.chat_id,
+            voice=voice,
+            caption=caption,
+            parse_mode=None,
+            reply_parameters=ReplyParameters(message_id=target.message_id),
         )
     except Exception as error:
-        logger.warning(
-            "chat_action_failed action=record_voice exception_type=%s",
+        logger.error(
+            "voice_upload_failed exception_type=%s output_bytes=%d",
             type(error).__name__,
+            len(rendered.audio.data),
         )
+
+
+async def _safe_target_reply(
+    target: ReplyTarget,
+    text: str,
+    *,
+    response_kind: str,
+) -> None:
+    bot = target.bot
+    if bot is None:
+        logger.warning(
+            "text_response_skipped response_kind=%s reason=bot_unbound",
+            response_kind,
+        )
+        return
+    try:
+        await bot.send_message(
+            chat_id=target.chat_id,
+            text=text,
+            reply_parameters=ReplyParameters(message_id=target.message_id),
+        )
+    except Exception as error:
+        _log_text_send_failure(error, response_kind)
 
 
 async def _safe_answer(message: Message, text: str, *, response_kind: str) -> None:

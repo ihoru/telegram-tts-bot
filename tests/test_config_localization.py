@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from telegram_tts_bot.config import BotSettings, ConfigurationError
+from telegram_tts_bot.config import BotSettings, ConfigurationError, model_name_for_voice
 from telegram_tts_bot.localization import Locale, MessageKey, locale_for_language_code, message_text
 
 VALID_TOKEN = "123456:local-test-token"
@@ -18,6 +18,9 @@ def test_settings_use_documented_defaults() -> None:
     assert settings.tts_voice == "aiden"
     assert settings.max_concurrency == 1
     assert settings.max_concurrency_per_user == 1
+    assert settings.max_queue_size == 20
+    assert settings.max_queue_size_per_user == 10
+    assert settings.max_queue_wait_seconds == 600
     assert settings.log_level == 20
 
 
@@ -29,6 +32,9 @@ def test_settings_accept_safe_overrides() -> None:
         "TTS_VOICE": "baya",
         "TTS_MAX_CONCURRENCY": "8",
         "TTS_MAX_CONCURRENCY_PER_USER": "2",
+        "TTS_MAX_QUEUE_SIZE": "30",
+        "TTS_MAX_QUEUE_SIZE_PER_USER": "4",
+        "TTS_MAX_QUEUE_WAIT_SECONDS": "900",
         "LOG_LEVEL": "warning",
     })
 
@@ -37,6 +43,9 @@ def test_settings_accept_safe_overrides() -> None:
     assert settings.tts_voice == "baya"
     assert settings.max_concurrency == 8
     assert settings.max_concurrency_per_user == 2
+    assert settings.max_queue_size == 30
+    assert settings.max_queue_size_per_user == 4
+    assert settings.max_queue_wait_seconds == 900
     assert settings.log_level == 30
 
 
@@ -61,6 +70,22 @@ def test_settings_accept_safe_overrides() -> None:
                 "TTS_MAX_CONCURRENCY_PER_USER": "2",
             },
             "TTS_MAX_CONCURRENCY_PER_USER must not exceed TTS_MAX_CONCURRENCY",
+        ),
+        (
+            {"TELEGRAM_BOT_TOKEN": VALID_TOKEN, "TTS_MAX_QUEUE_SIZE": "0"},
+            "TTS_MAX_QUEUE_SIZE must be a positive integer",
+        ),
+        (
+            {"TELEGRAM_BOT_TOKEN": VALID_TOKEN, "TTS_MAX_QUEUE_WAIT_SECONDS": "many"},
+            "TTS_MAX_QUEUE_WAIT_SECONDS must be a positive integer",
+        ),
+        (
+            {
+                "TELEGRAM_BOT_TOKEN": VALID_TOKEN,
+                "TTS_MAX_QUEUE_SIZE": "5",
+                "TTS_MAX_QUEUE_SIZE_PER_USER": "6",
+            },
+            "TTS_MAX_QUEUE_SIZE_PER_USER must not exceed TTS_MAX_QUEUE_SIZE",
         ),
         (
             {"TELEGRAM_BOT_TOKEN": VALID_TOKEN, "LOG_LEVEL": "verbose"},
@@ -106,6 +131,20 @@ def test_settings_accept_every_supported_voice(voice: str) -> None:
     })
 
     assert settings.tts_voice == voice
+
+
+@pytest.mark.parametrize(
+    ("voice", "model"),
+    [
+        ("aiden", "Qwen3-TTS"),
+        ("serena", "Qwen3-TTS"),
+        ("kseniya", "Silero"),
+        ("xenia", "Silero"),
+        ("baya", "Silero"),
+    ],
+)
+def test_voice_model_caption_labels(voice: str, model: str) -> None:
+    assert model_name_for_voice(voice) == model
 
 
 @pytest.mark.parametrize("language_code", ["ru", "RU", "ru-RU", "ru_ua"])

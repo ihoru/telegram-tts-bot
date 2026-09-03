@@ -44,12 +44,12 @@ def _run_launcher(
         (
             "run_bot",
             ["argument with spaces"],
-            ["run", "python", "-m", "telegram_tts_bot", "argument with spaces"],
+            ["run", "--active", "python", "-m", "telegram_tts_bot", "argument with spaces"],
         ),
         (
             "tts",
             ["--voice", "serena"],
-            ["run", "tts-to-ogg", "--voice", "serena"],
+            ["run", "--active", "tts-to-ogg", "--voice", "serena"],
         ),
     ],
 )

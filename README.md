@@ -10,36 +10,43 @@
 [Deployment guide](DEPLOYMENT.md) ·
 [Privacy policy](https://telegram-tts-bot.iho.su/)
 
-Read Aloud is a deployed, local-first Telegram bot that turns regular and forwarded text
-into voice notes. It runs Qwen3-TTS or Silero on the host, returns Telegram-ready
-OGG/Opus audio, and keeps no message or generated-audio history.
+Read Aloud is a deployed, local-first Telegram bot that turns regular and forwarded text,
+including media captions, into voice notes. It runs Qwen3-TTS or Silero on the host,
+returns Telegram-ready OGG/Opus audio, and keeps no message or generated-audio history.
 
 This is a production-oriented Python service rather than a model demo: it includes a
 typed and tested rendering boundary, explicit overload control, reproducible model
 provisioning, a non-root GPU-capable container, and release automation with provenance
 and SBOM generation.
 
+The accepted runtime behavior is defined by
+[SPEC-0008](specs/0008-faster-qwen-runtime.md) and
+[SPEC-0010](specs/0010-bounded-fair-rendering-queue.md).
+
 ## Engineering highlights
 
 - One rendering interface supports both GPU-backed Qwen and CPU-friendly Silero.
 - Telegram handlers and the CLI share the same deterministic OGG/Opus pipeline.
-- Global and per-user admission control reject overload without hiding work in a queue.
+- A bounded in-memory queue preserves per-user FIFO order and rotates fairly among users.
+- Voice-note captions report the configured model, voice, render time, and queue time.
 - CI covers linting, strict typing, unit tests, packaging, and real-model containers.
 - Model hashes, third-party licenses, deployment requirements, and privacy boundaries
   are documented explicitly.
 
 ## What it does
 
-- Speaks ordinary and forwarded private text messages with startup-selected `aiden`,
-  `serena`, `kseniya`, `xenia`, or `baya`.
+- Speaks ordinary and forwarded private text messages and media captions with
+  startup-selected `aiden`, `serena`, `kseniya`, `xenia`, or `baya`.
 - Uses Qwen Aiden by default for mixed Russian-English text; Serena uses the same local
   model, while the three Silero voices remain lightweight Russian-first alternatives.
 - Replies with mono, 48 kHz OGG/Opus audio suitable for Telegram voice-note playback.
 - Provides `tts-to-ogg` for testing the exact rendering path without Telegram.
 - Runs speech generation locally and never writes Telegram messages or generated audio
   to persistent storage.
-- Rejects overload immediately: one render pipeline globally and per user by default,
-  with no hidden queue.
+- Queues up to 20 waiting requests globally and 10 per user in process memory, preserving
+  per-user FIFO order while rotating fairly among users.
+- Keeps `record_voice` active only while a chat is actually rendering and captions each
+  result with its configured model, voice, render time, and queue time.
 
 Read Aloud is an ordinary public BotFather bot. Disabling groups does not make direct
 messages private or friends-only; anyone who discovers its username can send it text.
@@ -148,10 +155,14 @@ and verification checklist are maintained in
 | `TTS_VOICE` | No | `aiden` | One of `aiden`, `serena`, `kseniya`, `xenia`, or `baya`. |
 | `TTS_MAX_CONCURRENCY` | No | `1` | Maximum active render pipelines process-wide. Qwen requires exactly `1`. |
 | `TTS_MAX_CONCURRENCY_PER_USER` | No | `1` | Maximum active pipelines for one Telegram user. |
+| `TTS_MAX_QUEUE_SIZE` | No | `20` | Maximum waiting requests process-wide; active renders are excluded. |
+| `TTS_MAX_QUEUE_SIZE_PER_USER` | No | `10` | Maximum waiting requests for one Telegram user. |
+| `TTS_MAX_QUEUE_WAIT_SECONDS` | No | `600` | Maximum time accepted work may wait before it expires. |
 | `LOG_LEVEL` | No | `INFO` | Standard Python logging level. |
 
-Both capacity values must be positive integers, and the per-user value cannot exceed the
-global value. Configuration is validated once at startup and remains immutable.
+All concurrency and queue values must be positive integers. Each per-user value cannot
+exceed its corresponding global value. Configuration is validated once at startup and
+remains immutable.
 
 Set one value in `.env` or the process environment and restart the bot to change the
 process-wide voice:
@@ -219,8 +230,9 @@ synthesis, or write failures, and `130` for interruption.
 ```mermaid
 flowchart LR
     telegram[Telegram text] --> router[aiogram private-chat router]
-    router --> gate[admission control]
-    gate --> renderer[VoiceRenderer]
+    router --> queue[bounded fair render queue]
+    queue --> progress[chat-scoped progress]
+    progress --> renderer[VoiceRenderer]
     stdin[stdin CLI] --> renderer
     renderer --> synth[WaveSynthesizer]
     synth --> provider{configured voice}
@@ -233,15 +245,21 @@ flowchart LR
     voice --> stdout[CLI stdout]
 ```
 
-Telegram handlers and the CLI depend on `VoiceRenderer`, not Qwen, Silero, or FFmpeg.
-The composition root selects one `WaveSynthesizer` from `TTS_VOICE`. The bot loads one
-model and configured speaker per process and runs blocking synthesis and encoding in a
-dedicated executor.
+Telegram handlers submit jobs to the render service, while the CLI depends directly on
+`VoiceRenderer`; neither depends on Qwen, Silero, or FFmpeg. The render service owns
+bounded admission, expiry, per-user FIFO order, and round-robin scheduling. A separate
+coordinator aggregates each user's wait notice and each private chat's `record_voice`
+stream. The composition root selects one `WaveSynthesizer` from `TTS_VOICE`. The bot
+loads one model and configured speaker per process and runs blocking synthesis and
+encoding in a dedicated executor.
 
-No runtime component downloads a model, opens a database, creates a cache, or stores
-input. Telegram still necessarily receives messages and returned voice notes as part of
-its service; "local-first" describes speech generation and this application's storage
-behavior, not Telegram's own retention.
+No runtime component downloads a model, opens a database, creates a cache, or persists
+input. Accepted text and minimal routing identifiers may remain in process memory while
+queued for at most ten minutes before rendering starts. This queue is non-durable: a
+crash or restart may lose accepted work, and shutdown notices are best-effort. Telegram
+still necessarily receives messages and returned voice notes as part of its service;
+"local-first" describes speech generation and this application's storage behavior, not
+Telegram's own retention.
 
 ## Docker
 
@@ -336,15 +354,17 @@ model-selection contract.
 Another process is polling with the same token. Stop the other local/container instance;
 Read Aloud intentionally supports exactly one replica.
 
-### The bot says it is busy
+### The bot says the queue is full or a request expired
 
-There is no waiting queue. Let the active render finish and retry. Raise capacity only
-after validating memory use on the deployment host.
+The bounded queue holds at most 20 waiting requests globally and 10 for one user by
+default, excluding active renders. Wait for existing work to finish and retry. A request
+that does not start within ten minutes expires and is never rendered later. Raise limits
+only after validating memory use and expected wait times on the deployment host.
 
 ### A forwarded post is not spoken
 
-Only Telegram's `Message.text` is accepted. A photo, video, or document caption remains
-unsupported even when forwarded.
+Telegram message text and media captions are supported. Media without textual content
+still receives unsupported-content guidance.
 
 ## License and security
 

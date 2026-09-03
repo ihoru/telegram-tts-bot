@@ -16,9 +16,10 @@ from telegram_tts_bot.activity import (
     UpdateLoggingMiddleware,
 )
 from telegram_tts_bot.bot_service import BotSpeechService
-from telegram_tts_bot.config import BotSettings, ConfigurationError
+from telegram_tts_bot.config import BotSettings, ConfigurationError, model_name_for_voice
 from telegram_tts_bot.environment import load_repository_environment
-from telegram_tts_bot.handlers import create_router
+from telegram_tts_bot.handlers import VoicePresentation, create_router
+from telegram_tts_bot.progress import TelegramProgressCoordinator
 from telegram_tts_bot.speech import VoiceRenderer, create_voice_renderer
 
 logger = logging.getLogger(__name__)
@@ -39,9 +40,15 @@ def configure_logging(level: int) -> None:
 def create_dispatcher(
     speech_service: BotSpeechService,
     activity: HandlerActivity,
+    progress: TelegramProgressCoordinator,
+    voice_presentation: VoicePresentation,
 ) -> Dispatcher:
     """Assemble the aiogram dispatcher and its workflow-data dependencies."""
-    dispatcher = Dispatcher(speech_service=speech_service)
+    dispatcher = Dispatcher(
+        speech_service=speech_service,
+        progress=progress,
+        voice_presentation=voice_presentation,
+    )
     dispatcher.update.outer_middleware(UpdateLoggingMiddleware())
     dispatcher.update.outer_middleware(HandlerActivityMiddleware(activity))
     router = create_router()
@@ -53,22 +60,16 @@ def create_dispatcher(
 async def _close_runtime_resources(
     *,
     activity: HandlerActivity,
+    progress: TelegramProgressCoordinator,
     speech_service: BotSpeechService | None,
     renderer: VoiceRenderer | None,
     bot: Bot,
 ) -> BaseException | None:
-    """Attempt every shutdown stage and return the first failure."""
-    operations: list[tuple[str, Awaitable[None]]] = [
-        ("handler_activity", activity.stop_and_wait()),
-    ]
-    if speech_service is not None:
-        operations.append(("speech_service", speech_service.close()))
-    elif renderer is not None:
-        operations.append(("renderer", renderer.close()))
-    operations.append(("telegram_session", bot.session.close()))
-
+    """Cancel queued work, drain active handlers, then close local and remote resources."""
     first_error: BaseException | None = None
-    for stage, operation in operations:
+
+    async def run_stage(stage: str, operation: Awaitable[None]) -> None:
+        nonlocal first_error
         try:
             await operation
         except BaseException as error:
@@ -79,6 +80,17 @@ async def _close_runtime_resources(
             )
             if first_error is None:
                 first_error = error
+
+    await run_stage("handler_stop_accepting", activity.stop_accepting())
+    if speech_service is not None:
+        await run_stage("speech_queue_shutdown", speech_service.begin_shutdown())
+    await run_stage("handler_wait_idle", activity.wait_until_idle())
+    await run_stage("telegram_progress", progress.close())
+    if speech_service is not None:
+        await run_stage("speech_service", speech_service.close())
+    elif renderer is not None:
+        await run_stage("renderer", renderer.close())
+    await run_stage("telegram_session", bot.session.close())
     return first_error
 
 
@@ -93,6 +105,7 @@ async def run_bot(
     renderer: VoiceRenderer | None = None
     speech_service: BotSpeechService | None = None
     activity = HandlerActivity()
+    progress = TelegramProgressCoordinator()
     primary_error: BaseException | None = None
     try:
         renderer = renderer_factory(
@@ -105,8 +118,19 @@ async def run_bot(
             renderer,
             global_limit=settings.max_concurrency,
             per_user_limit=settings.max_concurrency_per_user,
+            queue_limit=settings.max_queue_size,
+            per_user_queue_limit=settings.max_queue_size_per_user,
+            queue_wait_seconds=settings.max_queue_wait_seconds,
         )
-        dispatcher = create_dispatcher(speech_service, activity)
+        dispatcher = create_dispatcher(
+            speech_service,
+            activity,
+            progress,
+            VoicePresentation(
+                model_name=model_name_for_voice(settings.tts_voice),
+                voice_name=settings.tts_voice,
+            ),
+        )
         await bot.delete_webhook(drop_pending_updates=False)
         logger.info("bot_polling_started")
         await dispatcher.start_polling(bot, close_bot_session=False)
@@ -116,6 +140,7 @@ async def run_bot(
     finally:
         cleanup_error = await _close_runtime_resources(
             activity=activity,
+            progress=progress,
             speech_service=speech_service,
             renderer=renderer,
             bot=bot,

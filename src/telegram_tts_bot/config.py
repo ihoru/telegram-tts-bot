@@ -11,6 +11,9 @@ from pathlib import Path
 DEFAULT_SILERO_MODEL_PATH = Path(".models/silero/v5_5_ru.pt")
 DEFAULT_QWEN_MODEL_PATH = Path(".models/qwen3-tts-12hz-0.6b-customvoice")
 DEFAULT_TTS_VOICE = "aiden"
+DEFAULT_MAX_QUEUE_SIZE = 20
+DEFAULT_MAX_QUEUE_SIZE_PER_USER = 10
+DEFAULT_MAX_QUEUE_WAIT_SECONDS = 600
 QWEN_TTS_VOICES = ("aiden", "serena")
 SUPPORTED_TTS_VOICES = (*QWEN_TTS_VOICES, "kseniya", "xenia", "baya")
 
@@ -29,6 +32,9 @@ class BotSettings:
     tts_voice: str = DEFAULT_TTS_VOICE
     max_concurrency: int = 1
     max_concurrency_per_user: int = 1
+    max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE
+    max_queue_size_per_user: int = DEFAULT_MAX_QUEUE_SIZE_PER_USER
+    max_queue_wait_seconds: int = DEFAULT_MAX_QUEUE_WAIT_SECONDS
     log_level: int = logging.INFO
 
     @classmethod
@@ -41,11 +47,30 @@ class BotSettings:
         voice = validate_tts_voice(values.get("TTS_VOICE", DEFAULT_TTS_VOICE))
         max_concurrency = _positive_integer(values, "TTS_MAX_CONCURRENCY", default=1)
         per_user = _positive_integer(values, "TTS_MAX_CONCURRENCY_PER_USER", default=1)
+        max_queue_size = _positive_integer(
+            values,
+            "TTS_MAX_QUEUE_SIZE",
+            default=DEFAULT_MAX_QUEUE_SIZE,
+        )
+        max_queue_size_per_user = _positive_integer(
+            values,
+            "TTS_MAX_QUEUE_SIZE_PER_USER",
+            default=DEFAULT_MAX_QUEUE_SIZE_PER_USER,
+        )
+        max_queue_wait_seconds = _positive_integer(
+            values,
+            "TTS_MAX_QUEUE_WAIT_SECONDS",
+            default=DEFAULT_MAX_QUEUE_WAIT_SECONDS,
+        )
         if voice in QWEN_TTS_VOICES and max_concurrency != 1:
             raise ConfigurationError("TTS_MAX_CONCURRENCY must be 1 when TTS_VOICE uses Qwen")
         if per_user > max_concurrency:
             raise ConfigurationError(
                 "TTS_MAX_CONCURRENCY_PER_USER must not exceed TTS_MAX_CONCURRENCY"
+            )
+        if max_queue_size_per_user > max_queue_size:
+            raise ConfigurationError(
+                "TTS_MAX_QUEUE_SIZE_PER_USER must not exceed TTS_MAX_QUEUE_SIZE"
             )
 
         return cls(
@@ -59,6 +84,9 @@ class BotSettings:
             tts_voice=voice,
             max_concurrency=max_concurrency,
             max_concurrency_per_user=per_user,
+            max_queue_size=max_queue_size,
+            max_queue_size_per_user=max_queue_size_per_user,
+            max_queue_wait_seconds=max_queue_wait_seconds,
             log_level=_logging_level(values.get("LOG_LEVEL", "INFO")),
         )
 
@@ -69,6 +97,11 @@ def validate_tts_voice(value: str) -> str:
         choices = ", ".join(SUPPORTED_TTS_VOICES)
         raise ConfigurationError(f"TTS_VOICE must be one of: {choices}")
     return value
+
+
+def model_name_for_voice(voice: str) -> str:
+    """Return the stable caption label for one validated voice."""
+    return "Qwen3-TTS" if voice in QWEN_TTS_VOICES else "Silero"
 
 
 def _validate_token(token: str) -> None:

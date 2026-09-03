@@ -36,10 +36,20 @@ class HandlerActivity:
             if self._active == 0:
                 self._condition.notify_all()
 
-    async def stop_and_wait(self) -> None:
+    async def stop_accepting(self) -> None:
+        """Reject handlers that have not entered while preserving active calls."""
         async with self._condition:
             self._accepting = False
+
+    async def wait_until_idle(self) -> None:
+        """Wait until every previously admitted handler has returned."""
+        async with self._condition:
             await self._condition.wait_for(lambda: self._active == 0)
+
+    async def stop_and_wait(self) -> None:
+        """Backward-compatible composition of the two shutdown phases."""
+        await self.stop_accepting()
+        await self.wait_until_idle()
 
 
 def _handler_name(

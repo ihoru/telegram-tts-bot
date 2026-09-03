@@ -15,7 +15,14 @@ from telegram_tts_bot.activity import (
     UpdateLoggingMiddleware,
 )
 from telegram_tts_bot.config import BotSettings
-from telegram_tts_bot.runtime import configure_logging, create_dispatcher, run_bot
+from telegram_tts_bot.handlers import VoicePresentation
+from telegram_tts_bot.progress import TelegramProgressCoordinator
+from telegram_tts_bot.runtime import (
+    _close_runtime_resources,
+    configure_logging,
+    create_dispatcher,
+    run_bot,
+)
 from telegram_tts_bot.speech import VoiceRenderer
 
 
@@ -30,6 +37,20 @@ async def test_handler_activity_waits_and_rejects_late_intake() -> None:
 
     await activity.leave()
     await stopping
+
+
+async def test_handler_activity_separates_stop_from_idle_wait() -> None:
+    activity = HandlerActivity()
+    assert await activity.enter()
+
+    await activity.stop_accepting()
+    waiting = asyncio.create_task(activity.wait_until_idle())
+    await asyncio.sleep(0)
+    assert not await activity.enter()
+    assert not waiting.done()
+
+    await activity.leave()
+    await waiting
 
 
 async def test_activity_middleware_balances_success_and_failure() -> None:
@@ -133,6 +154,55 @@ class RuntimeDispatcher:
         self.events.append("polled")
 
 
+async def test_cleanup_cancels_queue_before_waiting_and_closes_session_last() -> None:
+    events: list[str] = []
+    activity = HandlerActivity()
+    assert await activity.enter()
+    assert await activity.enter()
+    queued_cancelled = asyncio.Event()
+
+    class SpeechService:
+        async def begin_shutdown(self) -> None:
+            events.append("queue_cancelled")
+            queued_cancelled.set()
+
+        async def close(self) -> None:
+            events.append("renderer_closed")
+
+    class Progress:
+        async def close(self) -> None:
+            events.append("progress_closed")
+
+    async def queued_handler() -> None:
+        await queued_cancelled.wait()
+        events.append("restart_notice")
+        await activity.leave()
+
+    async def active_handler() -> None:
+        await queued_cancelled.wait()
+        events.append("active_upload")
+        await activity.leave()
+
+    queued = asyncio.create_task(queued_handler())
+    active = asyncio.create_task(active_handler())
+    bot = RuntimeBot("123:token", events)
+
+    error = await _close_runtime_resources(
+        activity=activity,
+        progress=cast(TelegramProgressCoordinator, Progress()),
+        speech_service=cast(Any, SpeechService()),
+        renderer=None,
+        bot=cast(Bot, bot),
+    )
+    await asyncio.gather(queued, active)
+
+    assert error is None
+    assert events[0] == "queue_cancelled"
+    assert events[-3:] == ["progress_closed", "renderer_closed", "session_closed"]
+    assert events.index("restart_notice") < events.index("progress_closed")
+    assert events.index("active_upload") < events.index("progress_closed")
+
+
 async def test_run_bot_preserves_updates_and_closes_resources_in_order(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -151,7 +221,12 @@ async def test_run_bot_preserves_updates_and_closes_resources_in_order(
         }
         return cast(VoiceRenderer, renderer)
 
-    def dispatcher_factory(_service: object, _activity: object) -> Dispatcher:
+    def dispatcher_factory(
+        _service: object,
+        _activity: object,
+        _progress: object,
+        _voice_presentation: object,
+    ) -> Dispatcher:
         return cast(Dispatcher, RuntimeDispatcher(events))
 
     monkeypatch.setattr(runtime, "create_dispatcher", dispatcher_factory)
@@ -201,7 +276,9 @@ async def test_run_bot_closes_session_when_renderer_shutdown_fails(
     monkeypatch.setattr(
         runtime,
         "create_dispatcher",
-        lambda _service, _activity: cast(Dispatcher, RuntimeDispatcher(events)),
+        lambda _service, _activity, _progress, _voice_presentation: cast(
+            Dispatcher, RuntimeDispatcher(events)
+        ),
     )
 
     with pytest.raises(RuntimeError, match="renderer shutdown failed"):
@@ -234,7 +311,9 @@ async def test_run_bot_preserves_polling_failure_when_cleanup_also_fails(
     monkeypatch.setattr(
         runtime,
         "create_dispatcher",
-        lambda _service, _activity: cast(Dispatcher, FailingDispatcher(events)),
+        lambda _service, _activity, _progress, _voice_presentation: cast(
+            Dispatcher, FailingDispatcher(events)
+        ),
     )
 
     with pytest.raises(RuntimeError, match="primary polling failure"):
@@ -259,10 +338,21 @@ def test_create_dispatcher_exposes_speech_service() -> None:
     renderer = RuntimeRenderer()
     from telegram_tts_bot.bot_service import BotSpeechService
 
-    service = BotSpeechService(cast(VoiceRenderer, renderer), global_limit=1, per_user_limit=1)
-    dispatcher = create_dispatcher(service, HandlerActivity())
+    service = BotSpeechService(
+        cast(VoiceRenderer, renderer),
+        global_limit=1,
+        per_user_limit=1,
+        queue_limit=20,
+        per_user_queue_limit=10,
+        queue_wait_seconds=600,
+    )
+    progress = TelegramProgressCoordinator()
+    presentation = VoicePresentation(model_name="Qwen3-TTS", voice_name="aiden")
+    dispatcher = create_dispatcher(service, HandlerActivity(), progress, presentation)
 
     assert dispatcher.workflow_data["speech_service"] is service
+    assert dispatcher.workflow_data["progress"] is progress
+    assert dispatcher.workflow_data["voice_presentation"] is presentation
     assert len(dispatcher.sub_routers) == 1
 
 

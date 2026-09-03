@@ -1,13 +1,17 @@
 ---
 id: "0003"
 title: Record-voice chat action
-status: implemented
+status: superseded
 created: 2026-08-27
 updated: 2026-08-27
 supersedes: null
+superseded_by: "0010"
 ---
 
 # SPEC-0003: Record-voice chat action
+
+Superseded by SPEC-0010, which retains active-render activity while replacing the
+one-shot and non-queueing behavior with bounded fair queueing and refreshed progress.
 
 ## Summary
 

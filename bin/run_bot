@@ -4,4 +4,4 @@ set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$repository_root"
-exec uv run python -m telegram_tts_bot "$@"
+exec uv run --active python -m telegram_tts_bot "$@"

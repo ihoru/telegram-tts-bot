@@ -127,7 +127,7 @@ Russian:
 • Текст в подписи к фото, видео или файлу тоже можно озвучить.
 • Получите голосовую заметку в ответ.
 
-Бот работает только в личном чате. Лучше всего он работает с русским текстом; качество английских слов и фраз зависит от настроенного голоса. Озвучивается только текст сообщения или подписи, без самого медиа, имени автора и данных пересылки. Сообщения и готовое аудио не сохраняются. Если бот занят, попробуйте снова позже.
+Бот работает только в личном чате. Лучше всего он работает с русским текстом; качество английских слов и фраз зависит от настроенного голоса. Озвучивается только текст сообщения или подписи, без самого медиа, имени автора и данных пересылки. Сообщения и готовое аудио не сохраняются. Если бот занят, запросы ожидают в ограниченной очереди.
 
 /start — показать приветствие
 /help — показать эту справку
@@ -145,7 +145,7 @@ How to use the bot:
 • Text in a photo, video, or file caption can be voiced too.
 • Receive a voice note in reply.
 
-The bot works only in private chats. It is strongest in Russian; the quality of English words and phrases depends on the configured voice. It reads only the message text or caption, not the media, author name, or forwarding details. Messages and generated audio are not stored. If the bot is busy, try again later.
+The bot works only in private chats. It is strongest in Russian; the quality of English words and phrases depends on the configured voice. It reads only the message text or caption, not the media, author name, or forwarding details. Messages and generated audio are not stored. If the bot is busy, requests wait in a bounded queue.
 
 /start — show the welcome message
 /help — show this help

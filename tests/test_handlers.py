@@ -1,26 +1,38 @@
 import asyncio
 import logging
-import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, cast
 
 import pytest
 from aiogram import Bot
-from aiogram.enums import ChatAction, ChatType
-from aiogram.types import BufferedInputFile, Chat, Message, Update, User
+from aiogram.enums import ChatType
+from aiogram.types import (
+    BufferedInputFile,
+    Chat,
+    Message,
+    ReplyParameters,
+    Update,
+    User,
+)
 
 from telegram_tts_bot.activity import HandlerActivity
 from telegram_tts_bot.bot_service import (
+    AbortReason,
     BotSpeechService,
     RejectionReason,
+    RenderAborted,
     RenderedVoice,
+    RenderJob,
     RenderRejected,
 )
 from telegram_tts_bot.handlers import (
     MAX_TELEGRAM_TEXT_LENGTH,
     PrivateChatFilter,
     TextMessageFilter,
+    VoicePresentation,
     create_router,
     handle_help,
     handle_start,
@@ -28,10 +40,12 @@ from telegram_tts_bot.handlers import (
     handle_unsupported,
 )
 from telegram_tts_bot.localization import Locale, MessageKey, message_text
+from telegram_tts_bot.progress import ReplyTarget, TelegramProgressCoordinator
 from telegram_tts_bot.runtime import create_dispatcher
 from telegram_tts_bot.speech import VoiceAudio
 
 MESSAGE_DATE = datetime(2026, 8, 27, tzinfo=UTC)
+PRESENTATION = VoicePresentation(model_name="Qwen3-TTS", voice_name="aiden")
 
 
 @dataclass
@@ -40,19 +54,37 @@ class FakeUser:
     language_code: str | None = "en"
 
 
-@dataclass
+@dataclass(eq=False)
 class FakeBot:
-    chat_actions: list[tuple[int, str]] = field(default_factory=list)
-    events: list[str] | None = None
+    messages: list[tuple[int, str, ReplyParameters | None]] = field(default_factory=list)
+    voices: list[tuple[int, BufferedInputFile, str, ReplyParameters | None]] = field(
+        default_factory=list
+    )
     send_error: Exception | None = None
 
-    async def send_chat_action(self, *, chat_id: int, action: str) -> bool:
+    async def send_message(
+        self,
+        *,
+        chat_id: int,
+        text: str,
+        reply_parameters: ReplyParameters | None = None,
+    ) -> None:
         if self.send_error is not None:
             raise self.send_error
-        self.chat_actions.append((chat_id, action))
-        if self.events is not None:
-            self.events.append("chat_action")
-        return True
+        self.messages.append((chat_id, text, reply_parameters))
+
+    async def send_voice(
+        self,
+        *,
+        chat_id: int,
+        voice: BufferedInputFile,
+        caption: str,
+        parse_mode: None,
+        reply_parameters: ReplyParameters | None = None,
+    ) -> None:
+        if self.send_error is not None:
+            raise self.send_error
+        self.voices.append((chat_id, voice, caption, reply_parameters))
 
 
 @dataclass
@@ -65,13 +97,12 @@ class FakeMessage:
     text: str | None = None
     caption: str | None = None
     forward_origin: object | None = None
+    message_id: int = 9
     answers: list[str] = field(default_factory=list)
     replies: list[str] = field(default_factory=list)
-    voices: list[BufferedInputFile] = field(default_factory=list)
     send_error: Exception | None = None
     bot: FakeBot = field(default_factory=FakeBot)
     chat: FakeChat = field(default_factory=FakeChat)
-    events: list[str] | None = None
 
     async def answer(self, text: str) -> None:
         if self.send_error is not None:
@@ -83,32 +114,99 @@ class FakeMessage:
             raise self.send_error
         self.replies.append(text)
 
-    async def reply_voice(self, voice: BufferedInputFile) -> None:
-        if self.send_error is not None:
-            raise self.send_error
-        self.voices.append(voice)
-        if self.events is not None:
-            self.events.append("voice")
+
+class StubJob:
+    def __init__(
+        self,
+        outcome: RenderedVoice | RenderAborted | Exception,
+        *,
+        backlog_id: int | None = None,
+        start_abort: RenderAborted | None = None,
+    ) -> None:
+        self.outcome = outcome
+        self.backlog_id = backlog_id
+        self.start_abort = start_abort
+
+    async def wait_started(self) -> RenderAborted | None:
+        return self.start_abort
+
+    async def result(self) -> RenderedVoice | RenderAborted:
+        if isinstance(self.outcome, Exception):
+            raise self.outcome
+        return self.outcome
 
 
 class StubSpeechService:
-    def __init__(
-        self,
-        result: RenderedVoice | RenderRejected | Exception,
-        *,
-        events: list[str] | None = None,
-    ) -> None:
-        self.result = result
+    def __init__(self, submission: StubJob | RenderRejected) -> None:
+        self.submission = submission
         self.calls: list[tuple[int, str]] = []
-        self.events = events
+        self.cancelled: list[StubJob] = []
 
-    async def try_render(self, *, user_id: int, text: str) -> RenderedVoice | RenderRejected:
+    async def submit(self, *, user_id: int, text: str) -> RenderJob | RenderRejected:
         self.calls.append((user_id, text))
-        if self.events is not None:
-            self.events.append("render")
-        if isinstance(self.result, Exception):
-            raise self.result
-        return self.result
+        return cast(RenderJob | RenderRejected, self.submission)
+
+    async def cancel(self, job: RenderJob) -> None:
+        self.cancelled.append(cast(StubJob, cast(Any, job)))
+
+
+class StubProgress:
+    def __init__(self) -> None:
+        self.events: list[str] = []
+        self.notices: list[tuple[int, str, str]] = []
+
+    async def enter_backlog(self, **kwargs: Any) -> None:
+        self.events.append(f"queue_enter:{kwargs['backlog_id']}")
+
+    async def leave_backlog(self, **kwargs: Any) -> None:
+        self.events.append(f"queue_leave:{kwargs['backlog_id']}")
+
+    async def send_coalesced(self, **kwargs: Any) -> None:
+        self.notices.append((kwargs["user_id"], kwargs["kind"], kwargs["text"]))
+
+    @asynccontextmanager
+    async def rendering(self, _target: ReplyTarget) -> AsyncIterator[None]:
+        self.events.append("rendering_enter")
+        try:
+            yield
+        finally:
+            self.events.append("rendering_exit")
+
+
+def rendered(
+    data: bytes = b"ogg",
+    *,
+    queue: float = 2.417,
+    render: float = 5.123,
+) -> RenderedVoice:
+    return RenderedVoice(
+        VoiceAudio(data=data),
+        queue_duration_seconds=queue,
+        render_duration_seconds=render,
+    )
+
+
+@pytest.mark.parametrize(
+    ("presentation", "outcome", "expected"),
+    [
+        (
+            VoicePresentation(model_name="Qwen3-TTS", voice_name="aiden"),
+            rendered(queue=2.417, render=5.123),
+            "Qwen3-TTS (aiden) · render 5.123 s · queue 2.417 s",
+        ),
+        (
+            VoicePresentation(model_name="Silero", voice_name="xenia"),
+            rendered(queue=0.0, render=1.204),
+            "Silero (xenia) · render 1.204 s · queue 0.000 s",
+        ),
+    ],
+)
+def test_voice_caption_uses_stable_exact_format(
+    presentation: VoicePresentation,
+    outcome: RenderedVoice,
+    expected: str,
+) -> None:
+    assert presentation.caption(outcome) == expected
 
 
 def as_message(message: FakeMessage) -> Message:
@@ -123,6 +221,28 @@ def as_service(service: StubSpeechService) -> BotSpeechService:
     return cast(BotSpeechService, cast(Any, service))
 
 
+def as_progress(progress: StubProgress) -> TelegramProgressCoordinator:
+    return cast(TelegramProgressCoordinator, cast(Any, progress))
+
+
+async def call_text(
+    message: FakeMessage,
+    service: StubSpeechService,
+    progress: StubProgress | None = None,
+    *,
+    user: FakeUser | None = None,
+) -> StubProgress:
+    progress = progress or StubProgress()
+    await handle_text(
+        as_message(message),
+        as_user(user or FakeUser()),
+        as_service(service),
+        as_progress(progress),
+        PRESENTATION,
+    )
+    return progress
+
+
 async def test_start_and_help_use_sender_locale() -> None:
     russian = FakeMessage()
     english = FakeMessage()
@@ -135,44 +255,80 @@ async def test_start_and_help_use_sender_locale() -> None:
 
 
 @pytest.mark.parametrize("forward_origin", [None, "visible-user", "privacy-hidden"])
-async def test_direct_copied_and_forwarded_text_use_exact_same_path(
+async def test_successful_text_uses_queue_path_and_exact_caption(
     forward_origin: str | None,
 ) -> None:
     supplied_text = "  Точный текст без метаданных  "
     message = FakeMessage(text=supplied_text, forward_origin=forward_origin)
-    service = StubSpeechService(RenderedVoice(VoiceAudio(b"ogg")))
+    service = StubSpeechService(StubJob(rendered()))
 
-    await handle_text(
-        as_message(message),
-        as_user(FakeUser(id=88, language_code="ru")),
-        as_service(service),
-    )
+    progress = await call_text(message, service, user=FakeUser(id=88, language_code="ru"))
 
     assert service.calls == [(88, supplied_text)]
-    assert message.bot.chat_actions == [(message.chat.id, ChatAction.RECORD_VOICE)]
-    assert len(message.voices) == 1
-    assert message.voices[0].data == b"ogg"
-    assert message.voices[0].filename == "voice.ogg"
+    assert progress.events == ["rendering_enter", "rendering_exit"]
+    assert len(message.bot.voices) == 1
+    chat_id, voice, caption, reply = message.bot.voices[0]
+    assert chat_id == 42
+    assert voice.data == b"ogg"
+    assert caption == "Qwen3-TTS (aiden) · render 5.123 s · queue 2.417 s"
+    assert reply == ReplyParameters(message_id=9)
+
+
+async def test_queued_job_registers_one_backlog_until_start() -> None:
+    message = FakeMessage(text="queued")
+    service = StubSpeechService(StubJob(rendered(), backlog_id=11))
+
+    progress = await call_text(message, service)
+
+    assert progress.events == [
+        "queue_enter:11",
+        "queue_leave:11",
+        "rendering_enter",
+        "rendering_exit",
+    ]
 
 
 @pytest.mark.parametrize(
     ("reason", "key"),
     [
-        (RejectionReason.USER_CAPACITY, MessageKey.USER_BUSY),
-        (RejectionReason.GLOBAL_CAPACITY, MessageKey.GLOBAL_BUSY),
+        (RejectionReason.USER_QUEUE_FULL, MessageKey.USER_QUEUE_FULL),
+        (RejectionReason.GLOBAL_QUEUE_FULL, MessageKey.GLOBAL_QUEUE_FULL),
+        (RejectionReason.SHUTTING_DOWN, MessageKey.RESTARTING),
     ],
 )
-async def test_capacity_rejections_have_distinct_localized_responses(
+async def test_submission_rejections_are_coalesced_and_localized(
     reason: RejectionReason,
     key: MessageKey,
 ) -> None:
-    message = FakeMessage(text="hello")
-    service = StubSpeechService(RenderRejected(reason))
+    progress = await call_text(
+        FakeMessage(text="hello"),
+        StubSpeechService(RenderRejected(reason)),
+    )
 
-    await handle_text(as_message(message), as_user(FakeUser()), as_service(service))
+    assert progress.notices == [(42, reason.value, message_text(Locale.EN, key))]
 
-    assert message.replies == [message_text(Locale.EN, key)]
-    assert not message.voices
+
+@pytest.mark.parametrize(
+    ("reason", "key"),
+    [
+        (AbortReason.EXPIRED, MessageKey.QUEUE_EXPIRED),
+        (AbortReason.SHUTDOWN, MessageKey.RESTARTING),
+    ],
+)
+async def test_waiting_abort_leaves_backlog_and_sends_notice(
+    reason: AbortReason,
+    key: MessageKey,
+) -> None:
+    aborted = RenderAborted(reason)
+    progress = await call_text(
+        FakeMessage(text="hello"),
+        StubSpeechService(
+            StubJob(aborted, backlog_id=3, start_abort=aborted),
+        ),
+    )
+
+    assert progress.events == ["queue_enter:3", "queue_leave:3"]
+    assert progress.notices == [(42, reason.value, message_text(Locale.EN, key))]
 
 
 @pytest.mark.parametrize(
@@ -182,14 +338,13 @@ async def test_capacity_rejections_have_distinct_localized_responses(
         ("x" * (MAX_TELEGRAM_TEXT_LENGTH + 1), MessageKey.TEXT_TOO_LONG),
     ],
 )
-async def test_invalid_bot_text_is_rejected_before_rendering(text: str, key: MessageKey) -> None:
+async def test_invalid_text_is_rejected_before_submission(text: str, key: MessageKey) -> None:
     message = FakeMessage(text=text)
-    service = StubSpeechService(RenderedVoice(VoiceAudio(b"unused")))
+    service = StubSpeechService(StubJob(rendered()))
 
-    await handle_text(as_message(message), as_user(FakeUser()), as_service(service))
+    await call_text(message, service)
 
     assert service.calls == []
-    assert message.bot.chat_actions == []
     assert message.replies == [message_text(Locale.EN, key)]
 
 
@@ -262,22 +417,29 @@ async def test_dispatcher_routes_real_private_message_model(
     content: dict[str, Any],
     expected_text: str,
 ) -> None:
-    service = StubSpeechService(RenderedVoice(VoiceAudio(b"ogg")))
-    dispatcher = create_dispatcher(as_service(service), HandlerActivity())
-    sent_actions: list[tuple[int, str]] = []
-    sent_voices: list[BufferedInputFile] = []
+    service = StubSpeechService(StubJob(rendered()))
+    progress = StubProgress()
+    dispatcher = create_dispatcher(
+        as_service(service),
+        HandlerActivity(),
+        as_progress(progress),
+        PRESENTATION,
+    )
+    sent_voices: list[tuple[int, str]] = []
 
-    async def capture_chat_action(_bot: Bot, *, chat_id: int, action: str) -> bool:
-        sent_actions.append((chat_id, action))
+    async def capture_voice(
+        _bot: Bot,
+        *,
+        chat_id: int,
+        voice: BufferedInputFile,
+        caption: str,
+        **_kwargs: Any,
+    ) -> None:
         await asyncio.sleep(0)
-        return True
+        assert voice.data == b"ogg"
+        sent_voices.append((chat_id, caption))
 
-    async def capture_voice(_message: Message, voice: BufferedInputFile) -> None:
-        sent_voices.append(voice)
-        await asyncio.sleep(0)
-
-    monkeypatch.setattr(Bot, "send_chat_action", capture_chat_action)
-    monkeypatch.setattr(Message, "reply_voice", capture_voice)
+    monkeypatch.setattr(Bot, "send_voice", capture_voice)
     bot = Bot(token="123456:local-test-token")
     update = Update.model_validate(
         {
@@ -304,80 +466,36 @@ async def test_dispatcher_routes_real_private_message_model(
         await bot.session.close()
 
     assert service.calls == [(88, expected_text)]
-    assert sent_actions == [(88, ChatAction.RECORD_VOICE)]
-    assert [voice.data for voice in sent_voices] == [b"ogg"]
-
-
-async def test_record_voice_action_precedes_render_and_upload() -> None:
-    events: list[str] = []
-    message = FakeMessage(
-        text="Порядок действий",
-        bot=FakeBot(events=events),
-        events=events,
-    )
-    service = StubSpeechService(
-        RenderedVoice(VoiceAudio(b"audio")),
-        events=events,
-    )
-
-    await handle_text(as_message(message), as_user(FakeUser()), as_service(service))
-
-    assert events == ["chat_action", "render", "voice"]
-
-
-async def test_chat_action_failure_does_not_prevent_rendering_or_leak_content(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    source_text = "private chat action failure sentinel"
-    telegram_error_text = "private Telegram error details"
-    message = FakeMessage(
-        text=source_text,
-        bot=FakeBot(send_error=RuntimeError(telegram_error_text)),
-    )
-    service = StubSpeechService(RenderedVoice(VoiceAudio(b"audio")))
-
-    with caplog.at_level(logging.WARNING):
-        await handle_text(as_message(message), as_user(FakeUser()), as_service(service))
-
-    assert service.calls == [(42, source_text)]
-    assert len(message.voices) == 1
-    assert "chat_action_failed action=record_voice exception_type=RuntimeError" in caplog.text
-    assert source_text not in caplog.text
-    assert telegram_error_text not in caplog.text
+    assert sent_voices == [(88, "Qwen3-TTS (aiden) · render 5.123 s · queue 2.417 s")]
 
 
 async def test_render_failure_logs_only_safe_diagnostics(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     secret_text = "highly private source text"
-    hidden_sender = "Hidden Person"
-    message = FakeMessage(text=secret_text, forward_origin=hidden_sender)
-    service = StubSpeechService(RuntimeError(secret_text))
+    message = FakeMessage(text=secret_text)
+    service = StubSpeechService(StubJob(RuntimeError(secret_text)))
 
     with caplog.at_level(logging.ERROR):
-        await handle_text(as_message(message), as_user(FakeUser()), as_service(service))
+        await call_text(message, service)
 
-    assert message.replies == [message_text(Locale.EN, MessageKey.RENDER_FAILED)]
     assert secret_text not in caplog.text
-    assert hidden_sender not in caplog.text
-    assert "RuntimeError" in caplog.text
+    assert "speech_render_failed exception_type=RuntimeError" in caplog.text
+    assert message.bot.messages[0][1] == message_text(Locale.EN, MessageKey.RENDER_FAILED)
 
 
-async def test_success_log_reports_render_duration_without_source_text(
+async def test_success_log_reports_both_durations_without_source_text(
     caplog: pytest.LogCaptureFixture,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    source_text = "private render timing sentinel"
-    message = FakeMessage(text=source_text)
-    service = StubSpeechService(RenderedVoice(VoiceAudio(b"audio")))
-    clock_values = iter((100.0, 101.23456))
-    monkeypatch.setattr(time, "perf_counter", lambda: next(clock_values))
-
+    source_text = "private timing sentinel"
     with caplog.at_level(logging.INFO):
-        await handle_text(as_message(message), as_user(FakeUser()), as_service(service))
+        await call_text(
+            FakeMessage(text=source_text),
+            StubSpeechService(StubJob(rendered(queue=1.25, render=3.5))),
+        )
 
-    assert "speech_rendered" in caplog.text
-    assert "render_duration_seconds=1.235" in caplog.text
+    assert "queue_duration_seconds=1.250" in caplog.text
+    assert "render_duration_seconds=3.500" in caplog.text
     assert source_text not in caplog.text
 
 
@@ -385,11 +503,10 @@ async def test_upload_failure_is_not_retried_or_logged_with_content(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     source_text = "never put this in logs"
-    message = FakeMessage(text=source_text, send_error=RuntimeError(source_text))
-    service = StubSpeechService(RenderedVoice(VoiceAudio(b"audio")))
+    message = FakeMessage(text=source_text, bot=FakeBot(send_error=RuntimeError(source_text)))
 
     with caplog.at_level(logging.ERROR):
-        await handle_text(as_message(message), as_user(FakeUser()), as_service(service))
+        await call_text(message, StubSpeechService(StubJob(rendered())))
 
     assert source_text not in caplog.text
     assert "voice_upload_failed" in caplog.text
