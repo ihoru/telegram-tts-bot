@@ -29,7 +29,7 @@ from telegram_tts_bot.localization import (
 )
 from telegram_tts_bot.progress import ReplyTarget, TelegramProgressCoordinator
 
-MAX_TELEGRAM_TEXT_LENGTH = 4096
+MAX_TELEGRAM_TEXT_LENGTH = 10096
 
 _RICH_TEXT_FIELDS = frozenset({
     "alternative_text",
@@ -204,7 +204,13 @@ async def handle_text(
         return
     if len(text) > MAX_TELEGRAM_TEXT_LENGTH:
         _release_admission(admission_turn)
-        await _safe_reply(message, message_text(locale, MessageKey.TEXT_TOO_LONG), "text_too_long")
+        await _safe_reply(
+            message,
+            message_text(locale, MessageKey.TEXT_TOO_LONG).format(
+                length=len(text), max_length=MAX_TELEGRAM_TEXT_LENGTH
+            ),
+            "text_too_long",
+        )
         return
 
     user_id = event_from_user.id

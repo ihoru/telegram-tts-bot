@@ -332,20 +332,34 @@ async def test_waiting_abort_leaves_backlog_and_sends_notice(
 
 
 @pytest.mark.parametrize(
-    ("text", "key"),
+    ("text", "language_code", "expected"),
     [
-        (" \n\t", MessageKey.EMPTY_TEXT),
-        ("x" * (MAX_TELEGRAM_TEXT_LENGTH + 1), MessageKey.TEXT_TOO_LONG),
+        (" \n\t", "en", "The message must contain text."),
+        (" \n\t", "ru", "Сообщение должно содержать текст."),
+        (
+            "x" * (MAX_TELEGRAM_TEXT_LENGTH + 1),
+            "en",
+            f"The text is too long: {MAX_TELEGRAM_TEXT_LENGTH + 1} characters. "
+            f"The maximum is {MAX_TELEGRAM_TEXT_LENGTH} characters.",
+        ),
+        (
+            "я" * (MAX_TELEGRAM_TEXT_LENGTH + 1),
+            "ru",
+            f"Текст слишком длинный: {MAX_TELEGRAM_TEXT_LENGTH + 1} символов. "
+            f"Максимум — {MAX_TELEGRAM_TEXT_LENGTH} символов.",
+        ),
     ],
 )
-async def test_invalid_text_is_rejected_before_submission(text: str, key: MessageKey) -> None:
+async def test_invalid_text_is_rejected_before_submission(
+    text: str, language_code: str, expected: str
+) -> None:
     message = FakeMessage(text=text)
     service = StubSpeechService(StubJob(rendered()))
 
-    await call_text(message, service)
+    await call_text(message, service, user=FakeUser(language_code=language_code))
 
     assert service.calls == []
-    assert message.replies == [message_text(Locale.EN, key)]
+    assert message.replies == [expected]
 
 
 async def test_unsupported_content_without_text_gets_guidance() -> None:

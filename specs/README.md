@@ -42,6 +42,7 @@ Statuses are `draft`, `accepted`, `implemented`, `rejected`, and `superseded`.
 | 0017 | Rich text and media-caption input | accepted | - |
 | 0018 | Debug incoming update and handler logging | accepted | - |
 | 0019 | Read Aloud rebrand | accepted | - |
+| 0020 | Text length feedback | accepted | - |
 
 `BOTFATHER.md` contains the operational profile pack accepted by the current numbered
 specification. Changes to that pack require a new numbered specification.

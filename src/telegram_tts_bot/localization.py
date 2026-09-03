@@ -91,7 +91,9 @@ _RU_MESSAGES: Final = MappingProxyType({
         "голосовой заметкой."
     ),
     MessageKey.EMPTY_TEXT: "Сообщение должно содержать текст.",
-    MessageKey.TEXT_TOO_LONG: "Текст слишком длинный. Максимум — 4096 символов.",
+    MessageKey.TEXT_TOO_LONG: (
+        "Текст слишком длинный: {length} символов. Максимум — {max_length} символов."
+    ),
     MessageKey.RENDER_FAILED: (
         "Не удалось озвучить сообщение. Попробуйте снова чуть позже."  # ruff: ignore[ambiguous-unicode-character-string]
     ),
@@ -149,7 +151,9 @@ _EN_MESSAGES: Final = MappingProxyType({
         "Send a text message or media with a text caption and I will reply with a voice note."
     ),
     MessageKey.EMPTY_TEXT: "The message must contain text.",
-    MessageKey.TEXT_TOO_LONG: "The text is too long. The maximum is 4,096 characters.",
+    MessageKey.TEXT_TOO_LONG: (
+        "The text is too long: {length} characters. The maximum is {max_length} characters."
+    ),
     MessageKey.RENDER_FAILED: ("I could not voice this message. Please try again a little later."),
 })
 
