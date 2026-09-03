@@ -44,7 +44,7 @@ ARG APP_UID=10001
 ARG APP_VERSION=0.1.0
 ARG VCS_REF=unknown
 
-LABEL org.opencontainers.image.title="Vslukh" \
+LABEL org.opencontainers.image.title="Read Aloud" \
       org.opencontainers.image.description="Local-first Telegram text-to-speech bot" \
       org.opencontainers.image.licenses="GPL-3.0-or-later AND CC-BY-NC-SA-4.0 AND Apache-2.0 AND MIT" \
       org.opencontainers.image.version="${APP_VERSION}" \
@@ -55,9 +55,9 @@ RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
         ca-certificates ffmpeg sox \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --gid "${APP_UID}" vslukh \
+    && groupadd --gid "${APP_UID}" ttsbot \
     && useradd --uid "${APP_UID}" --gid "${APP_UID}" --no-create-home \
-        --home-dir /nonexistent --shell /usr/sbin/nologin vslukh
+        --home-dir /nonexistent --shell /usr/sbin/nologin ttsbot
 
 WORKDIR /app
 COPY --from=build --chown=${APP_UID}:${APP_UID} /app/.venv /app/.venv
@@ -65,7 +65,7 @@ COPY --from=voice --chown=${APP_UID}:${APP_UID} /voice/v5_5_ru.pt /opt/silero/
 COPY LICENSE THIRD_PARTY_NOTICES.md licenses/silero-models-CC-BY-NC-SA-4.0.txt \
     licenses/faster-qwen3-tts-MIT.txt \
     licenses/qwen3-tts-Apache-2.0.txt \
-    /usr/share/doc/vslukh/
+    /usr/share/doc/telegram-tts-bot/
 
 ENV HOME=/nonexistent \
     PATH=/app/.venv/bin:$PATH \

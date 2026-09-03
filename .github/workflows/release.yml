@@ -77,12 +77,12 @@ jobs:
           platforms: linux/amd64
           load: true
           push: false
-          tags: vslukh:test
+          tags: telegram-tts-bot:test
           cache-from: type=gha,scope=test
           cache-to: type=gha,mode=max,scope=test
       - name: Run real-model integration tests
         run: >-
-          docker run --rm vslukh:test
+          docker run --rm telegram-tts-bot:test
           /app/.venv/bin/pytest --no-cov
           -m "integration and not stress" -s
       - name: Run two shared Silero renders under host limits
@@ -94,7 +94,7 @@ jobs:
             --memory 1g \
             --memory-swap 1g \
             --entrypoint /usr/bin/time \
-            vslukh:test \
+            telegram-tts-bot:test \
             -v /app/.venv/bin/pytest --no-cov \
             tests/speech/test_real_model.py::test_two_shared_model_renders_complete_under_resource_limit \
             -s
@@ -221,7 +221,7 @@ jobs:
         with:
           image: ${{ steps.release.outputs.image }}@${{ steps.digest.outputs.digest }}
           format: spdx-json
-          output-file: vslukh-container.spdx.json
+          output-file: telegram-tts-bot-container.spdx.json
           upload-artifact: false
           upload-release-assets: false
       - name: Attest image SBOM
@@ -229,7 +229,7 @@ jobs:
         with:
           subject-name: ${{ steps.release.outputs.image }}
           subject-digest: ${{ steps.digest.outputs.digest }}
-          sbom-path: vslukh-container.spdx.json
+          sbom-path: telegram-tts-bot-container.spdx.json
           push-to-registry: true
       - name: Build Python release artifacts
         run: uv build
@@ -238,7 +238,7 @@ jobs:
         with:
           files: |
             dist/*
-            vslukh-container.spdx.json
+            telegram-tts-bot-container.spdx.json
           fail_on_unmatched_files: true
           generate_release_notes: true
           make_latest: true

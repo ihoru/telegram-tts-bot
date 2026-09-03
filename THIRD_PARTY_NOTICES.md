@@ -1,6 +1,6 @@
 # Third-party notices
 
-Vslukh is distributed under GNU GPL-3.0-or-later. It depends on and, in its container
+Read Aloud is distributed under GNU GPL-3.0-or-later. It depends on and, in its container
 image, redistributes third-party software and model assets under their own terms. This
 summary is informational; the upstream license text and package metadata are
 authoritative.
@@ -59,7 +59,7 @@ retained in
 [`licenses/silero-models-CC-BY-NC-SA-4.0.txt`](licenses/silero-models-CC-BY-NC-SA-4.0.txt).
 The bundled weight may be used and redistributed only within the license's defined
 NonCommercial restriction. Other use requires separate permission from Silero. Adapted
-model material is subject to ShareAlike; Vslukh does not modify the distributed weight.
+model material is subject to ShareAlike; Read Aloud does not modify the distributed weight.
 The application remains GPL-3.0-or-later, and no claim is made here about the license of
 generated speech.
 

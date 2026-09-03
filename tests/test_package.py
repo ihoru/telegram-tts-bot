@@ -7,7 +7,7 @@ import telegram_tts_bot
 
 def test_package_is_installed() -> None:
     assert version("telegram-tts-bot") == "0.1.0"
-    assert telegram_tts_bot.__doc__ == "Vslukh Telegram text-to-speech bot."
+    assert telegram_tts_bot.__doc__ == "Read Aloud Telegram text-to-speech bot."
 
 
 def test_accelerated_qwen_runtime_is_installed_without_conflicting_distribution() -> None:

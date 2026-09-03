@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for improving Vslukh. The project favors small, evidence-backed changes and a
+Thank you for improving Read Aloud. The project favors small, evidence-backed changes and a
 stable maintenance surface over feature breadth.
 
 ## Start with the contract

@@ -38,7 +38,7 @@ class MessageKey(StrEnum):
 
 _RU_MESSAGES: Final = MappingProxyType({
     MessageKey.START: (
-        'Привет! Я "Вслух".\n\n'
+        "Привет! Это Read Aloud.\n\n"
         "Я превращаю обычные и пересланные текстовые сообщения в голосовые заметки. "
         "В зависимости от настроенного голоса бот также может естественно читать "  # ruff: ignore[ambiguous-unicode-character-string]
         "английские слова и фразы.\n\n"
@@ -95,7 +95,7 @@ _RU_MESSAGES: Final = MappingProxyType({
 
 _EN_MESSAGES: Final = MappingProxyType({
     MessageKey.START: (
-        "Hello! I am Vslukh.\n\n"
+        "Hi! This is Read Aloud.\n\n"
         "I turn regular and forwarded text messages into voice notes. Depending on "
         "the configured voice, the bot can also read English words and phrases "
         "naturally.\n\n"

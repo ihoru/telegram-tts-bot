@@ -1,6 +1,6 @@
 # BotFather launch pack
 
-This is the canonical copy/paste profile retained by SPEC-0008. Record the final username and
+This is the canonical copy/paste profile retained by SPEC-0019. Record the final username and
 verification date at the bottom; never record the token.
 
 Telegram currently limits display names to 64 characters, usernames to 5-32 Latin
@@ -11,31 +11,21 @@ HTTPS. Username availability must be checked live.
 
 ## Identity
 
+Default and English display name:
+
+```text
+Read Aloud - Text to Voice
+```
+
 Russian display name:
 
 ```text
-Вслух — текст в голос
+Read Aloud - озвучивание текста
 ```
 
-English display name:
-
-```text
-Vslukh — Text to Voice
-```
-
-Try usernames in this order:
-
-1. `@VslukhBot`
-2. `@VslukhVoiceBot`
-3. `@TextVslukhBot`
-4. `@VslukhTTSBot`
-
-Alternative name families retained for future rebranding:
-
-- `ПроЧти / Prochti`: `@ProchtiBot`, `@ProchtiVoiceBot`, `@ProchtiTTSBot`,
-  `@ListenDontReadBot`
-- `СловоЗвук / SlovoZvuk`: `@SlovoZvukBot`, `@SlovoVoiceBot`,
-  `@RussianVoiceNoteBot`, `@TextToVoiceRuBot`
+Existing username: `@TextToVoiceRuBot`. Telegram does not permit changing an existing
+bot's primary username, so retain it. The username is descriptive and contains no retired
+brand reference.
 
 ## About
 
@@ -56,13 +46,13 @@ Turns regular and forwarded text into voice notes. Local synthesis; this bot sto
 Russian:
 
 ```text
-Превращаю текст в голосовые сообщения прямо в Telegram. Лучше всего работаю с русским текстом; качество английских слов и фраз зависит от настроенного голоса. Озвучивание выполняется локально; бот не хранит сообщения или аудио.
+Read Aloud превращает текст в голосовые сообщения прямо в Telegram. Лучше всего бот работает с русским текстом; качество английских слов и фраз зависит от настроенного голоса. Озвучивание выполняется локально; бот не хранит сообщения или аудио.
 ```
 
 English:
 
 ```text
-I turn text into Telegram voice notes. Russian is strongest; English quality depends on the configured voice. Send or forward text and I will return ready-to-play audio. Speech generation runs locally; the bot stores neither messages nor audio.
+Read Aloud turns text into Telegram voice notes. Russian is strongest; English quality depends on the configured voice. Send or forward text and the bot will return ready-to-play audio. Speech generation runs locally; the bot stores neither messages nor audio.
 ```
 
 ## Privacy policy
@@ -94,7 +84,7 @@ help - Show detailed help
 Russian:
 
 ```text
-Привет! Я "Вслух".
+Привет! Это Read Aloud.
 
 Я превращаю обычные и пересланные текстовые сообщения в голосовые заметки. В зависимости от настроенного голоса бот также может естественно читать английские слова и фразы.
 
@@ -110,7 +100,7 @@ Russian:
 English:
 
 ```text
-Hello! I am Vslukh.
+Hi! This is Read Aloud.
 
 I turn regular and forwarded text messages into voice notes. Depending on the configured voice, the bot can also read English words and phrases naturally.
 
@@ -163,25 +153,25 @@ Privacy policy: http://telegram-tts-bot.iho.su/
 
 ## Avatar
 
-Upload `assets/vslukh-avatar.png`. Its editable source is
-`assets/vslukh-avatar.svg`. The mark uses a deep navy background, white speech bubble
+Upload `assets/read-aloud-avatar.png`. Its editable source is
+`assets/read-aloud-avatar.svg`. The mark uses a deep navy background, white speech bubble
 whose tail becomes a three-bar waveform, and one turquoise accent. It contains no text,
 shadows, gradients, or tiny detail and stays inside the central 70% circle-safe area.
 
 ## Setup checklist
 
-1. In BotFather, run `/newbot`, paste the recommended display name, and choose the first
-   available username from the ordered list.
-2. Store the issued token only in the runtime secret. Never paste it into this repository,
-   specifications, logs, shell history, Docker build arguments, or committed CI settings.
-3. Set the localized display names, About text, full descriptions, command lists, and
-   welcome copy from this document.
-4. Configure the privacy-policy URL from this document.
-5. Run `/setuserpic` and upload `assets/vslukh-avatar.png`.
-6. Run `/setjoingroups` and disable group joining.
-7. Leave group privacy enabled and inline mode disabled. Do not configure domains,
+1. In BotFather, select the existing `@TextToVoiceRuBot`; do not create a replacement bot
+   or rotate its token for this rebrand.
+2. Set the default, English, and Russian display names, About text, full descriptions,
+   and command lists from this document. `/start` and `/help` are runtime responses and
+   update when the new bot code is deployed; they are not pasted into BotFather.
+3. Keep the existing privacy-policy URL from this document; no URL change is required.
+4. The existing avatar artwork contains no text and does not need to be uploaded again.
+   If it is missing, run `/setuserpic` and upload `assets/read-aloud-avatar.png`.
+5. Keep group joining disabled.
+6. Leave group privacy enabled and inline mode disabled. Do not configure domains,
    payments, Mini Apps, description media, or extra commands for v1.
-8. In Russian and English Telegram clients, verify the profile, privacy-policy link,
+7. In Russian and English Telegram clients, verify the profile, privacy-policy link,
    `/start`, `/help`, direct text, forwarded text, unsupported media guidance, and a
    returned voice note.
 
@@ -190,6 +180,6 @@ bot. Anyone who discovers the username can send it messages.
 
 ## Verification record
 
-- Final username: _not created yet_
+- Final username: `@TextToVoiceRuBot`
 - Verified on: _not verified yet_
 - Verified by: _not verified yet_

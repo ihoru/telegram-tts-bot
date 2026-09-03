@@ -35,15 +35,15 @@ docker run --rm --entrypoint sh "$image" -c "test ! -e /opt/piper"
 docker run --rm --entrypoint sh "$image" -c \
   "test ! -e /models/qwen3-tts-12hz-0.6b-customvoice"
 docker run --rm --entrypoint test "$image" \
-  -f /usr/share/doc/vslukh/THIRD_PARTY_NOTICES.md
+  -f /usr/share/doc/telegram-tts-bot/THIRD_PARTY_NOTICES.md
 test "$(docker run --rm --entrypoint sha256sum "$image" \
-  /usr/share/doc/vslukh/silero-models-CC-BY-NC-SA-4.0.txt | cut -d ' ' -f 1)" = \
+  /usr/share/doc/telegram-tts-bot/silero-models-CC-BY-NC-SA-4.0.txt | cut -d ' ' -f 1)" = \
   "1349a4b6148492b44f629e64eed676612e234fe9a839e4f3b277c1482c8849f1"
 test "$(docker run --rm --entrypoint sha256sum "$image" \
-  /usr/share/doc/vslukh/qwen3-tts-Apache-2.0.txt | cut -d ' ' -f 1)" = \
+  /usr/share/doc/telegram-tts-bot/qwen3-tts-Apache-2.0.txt | cut -d ' ' -f 1)" = \
   "a44a6081c73ad75f0255bb2bb5cab74ef1829565a895a24e53a4f11290ab7655"
 test "$(docker run --rm --entrypoint sha256sum "$image" \
-  /usr/share/doc/vslukh/faster-qwen3-tts-MIT.txt | cut -d ' ' -f 1)" = \
+  /usr/share/doc/telegram-tts-bot/faster-qwen3-tts-MIT.txt | cut -d ' ' -f 1)" = \
   "442472a518bf71e371f2581aa0fcaf6ee2ef6854f78c340fdbe87c099950ea82"
 
 set +e

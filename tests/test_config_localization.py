@@ -120,7 +120,7 @@ def test_english_locale_is_the_fallback(language_code: str | None) -> None:
 
 def test_start_and_help_copy_match_the_accepted_profile() -> None:
     assert message_text(Locale.RU, MessageKey.START) == (
-        'Привет! Я "Вслух".\n\n'
+        "Привет! Это Read Aloud.\n\n"
         "Я превращаю обычные и пересланные текстовые сообщения в голосовые заметки. "
         "В зависимости от настроенного голоса бот также может естественно читать "  # ruff: ignore[ambiguous-unicode-character-string]
         "английские слова и фразы.\n\n"
@@ -131,7 +131,7 @@ def test_start_and_help_copy_match_the_accepted_profile() -> None:
         "Политика конфиденциальности: http://telegram-tts-bot.iho.su/"
     )
     assert message_text(Locale.EN, MessageKey.START) == (
-        "Hello! I am Vslukh.\n\n"
+        "Hi! This is Read Aloud.\n\n"
         "I turn regular and forwarded text messages into voice notes. Depending on "
         "the configured voice, the bot can also read English words and phrases "
         "naturally.\n\n"

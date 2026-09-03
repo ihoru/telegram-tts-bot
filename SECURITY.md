@@ -34,7 +34,7 @@ personal, alpha-stage project.
 - `TELEGRAM_BOT_TOKEN` is the only bot credential. Supply it through the runtime
   environment or a deployment secret store, never a committed file or Docker build
   argument. Revoke it immediately with BotFather if exposure is suspected.
-- Vslukh stores no Telegram messages or rendered audio. It keeps data in process memory
+- Read Aloud stores no Telegram messages or rendered audio. It keeps data in process memory
   only for rendering and upload. The CLI writes only the explicitly requested output.
 - Logs omit message text, names, usernames, forwarding metadata, and token values.
 - The Qwen adapter accepts exactly eleven pinned snapshot files and verifies every

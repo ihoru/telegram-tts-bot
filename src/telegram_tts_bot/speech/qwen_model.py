@@ -204,7 +204,7 @@ def provision(
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Download the pinned Vslukh Qwen3-TTS model")
+    parser = argparse.ArgumentParser(description="Download the pinned Read Aloud Qwen3-TTS model")
     parser.add_argument(
         "--output-dir",
         type=Path,

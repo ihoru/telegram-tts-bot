@@ -2,9 +2,9 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-source_file="$repository_root/assets/vslukh-avatar.svg"
-output_file="$repository_root/assets/vslukh-avatar.png"
-temporary_file="$repository_root/assets/.vslukh-avatar.png.tmp"
+source_file="$repository_root/assets/read-aloud-avatar.svg"
+output_file="$repository_root/assets/read-aloud-avatar.png"
+temporary_file="$repository_root/assets/.read-aloud-avatar.png.tmp"
 
 if ! command -v convert >/dev/null 2>&1; then
   echo "ImageMagick 'convert' is required to render the avatar." >&2

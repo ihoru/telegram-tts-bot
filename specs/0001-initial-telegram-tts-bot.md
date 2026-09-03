@@ -15,7 +15,7 @@ BotFather welcome-message and privacy-policy additions.
 
 ## Summary
 
-Build Vslukh, an independently extractable Python 3.14 Telegram bot that turns private
+Build Read Aloud, an independently extractable Python 3.14 Telegram bot that turns private
 text messages, including forwarded text messages, into Russian OGG/Opus voice notes.
 Speech generation is local and replaceable at a narrow code seam. The runtime retains
 neither messages nor generated audio.

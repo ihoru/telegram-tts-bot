@@ -1,7 +1,7 @@
-# Vslukh
+# Read Aloud
 
 <p align="center">
-  <img src="assets/vslukh-avatar.png" alt="Vslukh logo" width="180">
+  <img src="assets/read-aloud-avatar.png" alt="Read Aloud logo" width="180">
 </p>
 
 [![CI](https://github.com/ihoru/telegram-tts-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/ihoru/telegram-tts-bot/actions/workflows/ci.yml)
@@ -10,7 +10,7 @@
 [Deployment guide](DEPLOYMENT.md) ·
 [Privacy policy](https://telegram-tts-bot.iho.su/)
 
-Vslukh is a deployed, local-first Telegram bot that turns regular and forwarded text
+Read Aloud is a deployed, local-first Telegram bot that turns regular and forwarded text
 into voice notes. It runs Qwen3-TTS or Silero on the host, returns Telegram-ready
 OGG/Opus audio, and keeps no message or generated-audio history.
 
@@ -41,7 +41,7 @@ and SBOM generation.
 - Rejects overload immediately: one render pipeline globally and per user by default,
   with no hidden queue.
 
-Vslukh is an ordinary public BotFather bot. Disabling groups does not make direct
+Read Aloud is an ordinary public BotFather bot. Disabling groups does not make direct
 messages private or friends-only; anyone who discovers its username can send it text.
 Application-level allowlists are intentionally outside v1.
 
@@ -103,7 +103,7 @@ Install FFmpeg and SoX with your operating-system package manager, then verify t
 default Qwen renderer on a CUDA host without a Telegram token:
 
 ```bash
-printf '%s' 'Привет! Это Вслух.' | ./bin/tts sample.ogg
+printf '%s' 'Hi! This is Read Aloud.' | ./bin/tts sample.ogg
 ffprobe -v error sample.ogg
 ```
 
@@ -134,7 +134,7 @@ and verification checklist are maintained in
 1. Create the bot and store its token as a runtime secret.
 2. Configure the localized name, About text, description, and `/start` and `/help`
    commands from the launch pack.
-3. Upload [`assets/vslukh-avatar.png`](assets/vslukh-avatar.png).
+3. Upload [`assets/read-aloud-avatar.png`](assets/read-aloud-avatar.png).
 4. Disable group joining, leave group privacy enabled, and leave inline mode disabled.
 5. Verify direct text, forwarded text, unsupported media guidance, and both locales.
 
@@ -252,7 +252,7 @@ secret handling, automatic restarts, verification, and upgrades, see
 Build the final amd64 image:
 
 ```bash
-docker build --platform linux/amd64 --target runtime -t vslukh:local .
+docker build --platform linux/amd64 --target runtime -t telegram-tts-bot:local .
 ```
 
 Run the default Qwen voice with the ignored environment file, a read-only verified model
@@ -261,7 +261,7 @@ mount, and one NVIDIA GPU:
 ```bash
 docker run --rm --init --gpus device=0 --env-file .env \
   --mount type=bind,source=/absolute/path/to/.models/qwen3-tts-12hz-0.6b-customvoice,target=/models/qwen3-tts-12hz-0.6b-customvoice,readonly \
-  vslukh:local
+  telegram-tts-bot:local
 ```
 
 The image runs as an unprivileged user, verifies the mounted Qwen snapshot before load,
@@ -274,7 +274,7 @@ Test the baked renderer without starting Telegram:
 
 ```bash
 container_id=$(docker create --interactive --env TTS_VOICE=kseniya \
-  --env TTS_MAX_CONCURRENCY=2 --entrypoint tts-to-ogg vslukh:local /tmp/sample.ogg)
+  --env TTS_MAX_CONCURRENCY=2 --entrypoint tts-to-ogg telegram-tts-bot:local /tmp/sample.ogg)
 printf '%s' 'Проверка контейнера' | docker start --attach --interactive "$container_id"
 docker cp "$container_id:/tmp/sample.ogg" ./container-sample.ogg
 docker rm "$container_id"
@@ -334,7 +334,7 @@ model-selection contract.
 ### Telegram reports a polling conflict
 
 Another process is polling with the same token. Stop the other local/container instance;
-Vslukh intentionally supports exactly one replica.
+Read Aloud intentionally supports exactly one replica.
 
 ### The bot says it is busy
 
@@ -348,7 +348,7 @@ unsupported even when forwarded.
 
 ## License and security
 
-Vslukh is licensed under
+Read Aloud is licensed under
 [GNU GPL-3.0-or-later](LICENSE). Bundled and containerized third-party components are
 described in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Please report security
 issues through the private process in [SECURITY.md](SECURITY.md).

@@ -79,12 +79,12 @@ jobs:
           platforms: linux/amd64
           load: true
           push: false
-          tags: vslukh:test
+          tags: telegram-tts-bot:test
           cache-from: type=gha,scope=test
           cache-to: type=gha,mode=max,scope=test
       - name: Run real-model integration tests
         run: >-
-          docker run --rm vslukh:test
+          docker run --rm telegram-tts-bot:test
           /app/.venv/bin/pytest --no-cov
           -m "integration and not stress" -s
       - name: Build runtime image with pinned model
@@ -95,8 +95,8 @@ jobs:
           platforms: linux/amd64
           load: true
           push: false
-          tags: vslukh:ci
+          tags: telegram-tts-bot:ci
           cache-from: type=gha,scope=runtime
           cache-to: type=gha,mode=max,scope=runtime
       - name: Verify the exact runtime image
-        run: ./scripts/verify-runtime-image.sh vslukh:ci
+        run: ./scripts/verify-runtime-image.sh telegram-tts-bot:ci

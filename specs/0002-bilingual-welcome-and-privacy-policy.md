@@ -45,7 +45,7 @@ All SPEC-0001 decisions not explicitly changed below remain in force.
 ## User-visible behavior
 
 `/start` returns the localized welcome message selected by the existing `ru*` rule. The
-message introduces Vslukh, explains that regular and forwarded text becomes a Russian
+message introduces Read Aloud, explains that regular and forwarded text becomes a Russian
 voice note, states that synthesis is local and the bot stores neither messages nor
 generated audio, and points to `/help`.
 

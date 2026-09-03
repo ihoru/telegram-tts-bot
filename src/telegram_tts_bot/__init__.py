@@ -1,1 +1,1 @@
-"""Vslukh Telegram text-to-speech bot."""
+"""Read Aloud Telegram text-to-speech bot."""

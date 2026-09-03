@@ -34,6 +34,7 @@ Statuses are `draft`, `accepted`, `implemented`, `rejected`, and `superseded`.
 | 0009 | Qwen punctuation and CLI ergonomics | accepted | - |
 | 0010 | Bounded fair rendering queue and aggregated progress | accepted | - |
 | 0011 | Privacy-policy link in bot copy | accepted | - |
+| 0019 | Read Aloud rebrand | accepted | - |
 
 `BOTFATHER.md` contains the operational profile pack accepted by the current numbered
 specification. Changes to that pack require a new numbered specification.
