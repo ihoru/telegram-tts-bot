@@ -9,7 +9,12 @@ from collections.abc import Awaitable, Callable
 
 from aiogram import Bot, Dispatcher
 
-from telegram_tts_bot.activity import HandlerActivity, HandlerActivityMiddleware
+from telegram_tts_bot.activity import (
+    HandlerActivity,
+    HandlerActivityMiddleware,
+    HandlerLoggingMiddleware,
+    UpdateLoggingMiddleware,
+)
 from telegram_tts_bot.bot_service import BotSpeechService
 from telegram_tts_bot.config import BotSettings, ConfigurationError
 from telegram_tts_bot.environment import load_repository_environment
@@ -37,8 +42,11 @@ def create_dispatcher(
 ) -> Dispatcher:
     """Assemble the aiogram dispatcher and its workflow-data dependencies."""
     dispatcher = Dispatcher(speech_service=speech_service)
+    dispatcher.update.outer_middleware(UpdateLoggingMiddleware())
     dispatcher.update.outer_middleware(HandlerActivityMiddleware(activity))
-    dispatcher.include_router(create_router())
+    router = create_router()
+    router.message.middleware(HandlerLoggingMiddleware())
+    dispatcher.include_router(router)
     return dispatcher
 
 

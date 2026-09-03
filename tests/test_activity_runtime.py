@@ -1,13 +1,19 @@
 import asyncio
 import logging
 from collections.abc import Callable
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 from aiogram import Bot, Dispatcher
-from aiogram.types import TelegramObject
+from aiogram.types import TelegramObject, Update
 
-from telegram_tts_bot.activity import HandlerActivity, HandlerActivityMiddleware
+from telegram_tts_bot.activity import (
+    HandlerActivity,
+    HandlerActivityMiddleware,
+    HandlerLoggingMiddleware,
+    UpdateLoggingMiddleware,
+)
 from telegram_tts_bot.config import BotSettings
 from telegram_tts_bot.runtime import configure_logging, create_dispatcher, run_bot
 from telegram_tts_bot.speech import VoiceRenderer
@@ -45,6 +51,46 @@ async def test_activity_middleware_balances_success_and_failure() -> None:
         await middleware(failing, event, {})
 
     await activity.stop_and_wait()
+
+
+async def test_debug_update_logging_omits_null_values(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    middleware = UpdateLoggingMiddleware()
+    update = Update(update_id=17)
+
+    async def next_handler(_event: TelegramObject, _data: dict[str, Any]) -> str:
+        await asyncio.sleep(0)
+        return "handled"
+
+    with caplog.at_level(logging.DEBUG, logger="telegram_tts_bot.activity"):
+        assert await middleware(next_handler, update, {}) == "handled"
+
+    assert caplog.messages == ['incoming_update payload={"update_id":17}']
+
+
+async def test_debug_handler_logging_names_selected_handler(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    middleware = HandlerLoggingMiddleware()
+    event = cast(TelegramObject, object())
+
+    async def selected_handler(_event: TelegramObject, _data: dict[str, Any]) -> None:
+        await asyncio.sleep(0)
+        return None
+
+    async def next_handler(_event: TelegramObject, _data: dict[str, Any]) -> str:
+        await asyncio.sleep(0)
+        return "handled"
+
+    data = {
+        "event_update": Update(update_id=23),
+        "handler": SimpleNamespace(callback=selected_handler),
+    }
+    with caplog.at_level(logging.DEBUG, logger="telegram_tts_bot.activity"):
+        assert await middleware(next_handler, event, data) == "handled"
+
+    assert caplog.messages == ["update_processed update_id=23 handler=selected_handler"]
 
 
 class RuntimeRenderer:
