@@ -3,6 +3,7 @@ import importlib
 import io
 import math
 import struct
+import warnings
 import wave
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
@@ -230,6 +231,54 @@ def test_load_uses_packaged_cpu_model_and_fixed_warmup(
             "stress_single_vowel": True,
         }
     ]
+
+
+def test_load_suppresses_only_the_known_packaged_model_syntax_warning(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model = FakeModel()
+
+    class Importer:
+        def __init__(self, _path: str) -> None:
+            pass
+
+        def load_pickle(self, _package: str, _resource: str) -> FakeModel:
+            warnings.warn_explicit(
+                '"\\^" is an invalid escape sequence',
+                SyntaxWarning,
+                "<torch_package_0>.multi_acc_v3_package.py",
+                286,
+                module="<torch_package_0>.multi_acc_v3_package",
+            )
+            warnings.warn_explicit(
+                "another packaged-model warning",
+                SyntaxWarning,
+                "<torch_package_0>.another_module.py",
+                1,
+                module="<torch_package_0>.another_module",
+            )
+            return model
+
+    class Package:
+        PackageImporter = Importer
+
+    class Torch(FakeTorch):
+        package = Package()
+
+        def set_num_threads(self, _threads: int) -> None:
+            pass
+
+        def device(self, _device: str) -> str:
+            return "cpu"
+
+    monkeypatch.setattr(silero, "verify_model", lambda _path: None)
+    monkeypatch.setattr(importlib, "import_module", lambda _name: Torch())
+
+    with pytest.warns(SyntaxWarning, match="another packaged-model warning") as caught:
+        SileroWaveSynthesizer.load(tmp_path / "model.pt", "kseniya")
+
+    assert [str(warning.message) for warning in caught] == ["another packaged-model warning"]
 
 
 def test_load_validates_speaker_list_and_sanitizes_provider_errors(

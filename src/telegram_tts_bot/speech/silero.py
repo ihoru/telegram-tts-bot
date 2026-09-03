@@ -9,6 +9,7 @@ import hashlib
 import importlib
 import io
 import unicodedata
+import warnings
 import wave
 from collections.abc import Sequence
 from contextlib import AbstractContextManager
@@ -389,7 +390,15 @@ class SileroWaveSynthesizer:
             torch_module = cast(_TorchModule, importlib.import_module("torch"))
             torch_module.set_num_threads(1)
             importer = torch_module.package.PackageImporter(str(model_path))
-            model = cast(_SileroModel, importer.load_pickle("tts_models", "model"))
+            with warnings.catch_warnings():
+                # Python 3.14 diagnoses this escape in the pinned upstream archive.
+                warnings.filterwarnings(
+                    "ignore",
+                    message=r'"\\\^" is an invalid escape sequence',
+                    category=SyntaxWarning,
+                    module=r"<torch_package_\d+>\.multi_acc_v3_package",
+                )
+                model = cast(_SileroModel, importer.load_pickle("tts_models", "model"))
             model.to(torch_module.device("cpu"))
             if speaker not in model.speakers:
                 raise ValueError("speaker is absent")
