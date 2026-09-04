@@ -150,12 +150,20 @@ For server pulls choose one:
 
 1. Commit and push these repository changes with deployment disabled.
 2. Complete the server/key/GitHub setup and the harmless `check` command above.
-3. Set repository variable `DEPLOY_ENABLED=true`. Changing the variable alone does
+3. Bootstrap the registry using **Actions → CI → Run workflow**, selecting `main`.
+   This manual run executes the normal checks, publishes the verified image, and
+   verifies restricted SSH from a GitHub runner. It never replaces the bot, even
+   when deployment is enabled. Other branches cannot publish or access production.
+   Alternatively run `gh workflow run ci.yml --ref main --repo ihoru/telegram-tts-bot`.
+   A newly created GHCR package starts private: for public images, open its package
+   settings and change visibility to public, then verify an anonymous pull from the
+   server. Never publish a running container with `docker commit`; use the CI image.
+4. Set repository variable `DEPLOY_ENABLED=true`. Changing the variable alone does
    not launch a deployment.
-4. Merge or push the next feature to `main` and follow **Actions → CI**. Lint, tests,
+5. Merge or push the next feature to `main` and follow **Actions → CI**. Lint, tests,
    container verification, image publication, and production deployment must succeed.
    PR and tag runs never deploy. Superseded main commits are skipped before SSH.
-5. On the server verify the running image's revision against that feature's commit:
+6. On the server verify the running image's revision against that feature's commit:
 
 ```bash
 sudo docker inspect --format '{{.Config.Image}}' telegram-tts-bot

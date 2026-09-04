@@ -1,10 +1,11 @@
 ---
 id: "0022"
 title: Main branch Docker deployment over restricted SSH
-status: accepted
+status: superseded
 created: 2026-09-04
 updated: 2026-09-04
 supersedes: null
+superseded_by: "0023"
 ---
 
 # SPEC-0022: Main branch Docker deployment over restricted SSH
