@@ -1,0 +1,4 @@
+{
+  "runtime": "silero",
+  "env_file": "/opt/telegram-tts-bot/.env"
+}

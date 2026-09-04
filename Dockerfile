@@ -33,6 +33,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --all-groups --no-editable
 COPY --from=voice /voice /opt/silero
 COPY tests ./tests
+COPY scripts ./scripts
 ENV SILERO_MODEL_PATH=/opt/silero/v5_5_ru.pt \
     TTS_VOICE=kseniya \
     TTS_MAX_CONCURRENCY=2

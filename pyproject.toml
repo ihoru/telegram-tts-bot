@@ -90,6 +90,9 @@ select = [
   "UP",
 ]
 
+[tool.ruff.per-file-target-version]
+"scripts/deploy_server.py" = "py310"
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["assert"]
 
@@ -112,6 +115,7 @@ addopts = [
 ]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = [
   "integration: requires local system dependencies or real model assets",
   "stress: exercises constrained concurrent real-model rendering",

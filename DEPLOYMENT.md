@@ -1,5 +1,9 @@
 # Server deployment
 
+For deployment after each successful push to `main`, follow
+[automatic deployment over restricted SSH](docs/automatic-deployment.md). It keeps
+the `docker run` setup described below and includes server access and rollback.
+
 Read Aloud runs as one long-lived Docker container that polls Telegram. It does not expose
 an HTTP service, so it needs outbound internet access but no domain, reverse proxy, or
 inbound port.
