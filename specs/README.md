@@ -43,6 +43,7 @@ Statuses are `draft`, `accepted`, `implemented`, `rejected`, and `superseded`.
 | 0018 | Debug incoming update and handler logging | accepted | - |
 | 0019 | Read Aloud rebrand | accepted | - |
 | 0020 | Text length feedback | accepted | - |
+| 0021 | Repository link in help | implemented | - |
 | 0022 | Main branch Docker deployment over restricted SSH | superseded | 0023 |
 | 0023 | Publish-only deployment bootstrap and access verification | accepted | - |
 

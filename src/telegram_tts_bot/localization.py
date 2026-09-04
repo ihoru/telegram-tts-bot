@@ -9,6 +9,7 @@ from typing import Final
 _PRIVACY_POLICY_URL: Final = "http://telegram-tts-bot.iho.su/"
 _RU_PRIVACY_POLICY_LINE: Final = f"Политика конфиденциальности: {_PRIVACY_POLICY_URL}"
 _EN_PRIVACY_POLICY_LINE: Final = f"Privacy policy: {_PRIVACY_POLICY_URL}"
+_REPOSITORY_URL: Final = "https://github.com/ihoru/telegram-tts-bot"
 
 
 class Locale(StrEnum):
@@ -61,7 +62,8 @@ _RU_MESSAGES: Final = MappingProxyType({
         "Сообщения и готовое аудио не сохраняются. Если бот занят, запросы ожидают "
         "в ограниченной очереди.\n\n"
         "/start — показать приветствие\n"
-        "/help — показать эту справку\n\n" + _RU_PRIVACY_POLICY_LINE
+        "/help — показать эту справку\n\n"
+        f"Репозиторий: {_REPOSITORY_URL}\n\n" + _RU_PRIVACY_POLICY_LINE
     ),
     MessageKey.GLOBAL_BUSY: ("Сейчас все голоса заняты. Попробуйте ещё раз чуть позже."),
     MessageKey.USER_BUSY: (
@@ -124,7 +126,8 @@ _EN_MESSAGES: Final = MappingProxyType({
         "Messages and generated audio are not stored. If the bot is busy, requests "
         "wait in a bounded queue.\n\n"
         "/start — show the welcome message\n"
-        "/help — show this help\n\n" + _EN_PRIVACY_POLICY_LINE
+        "/help — show this help\n\n"
+        f"Repository: {_REPOSITORY_URL}\n\n" + _EN_PRIVACY_POLICY_LINE
     ),
     MessageKey.GLOBAL_BUSY: ("All voices are busy right now. Please try again a little later."),
     MessageKey.USER_BUSY: (

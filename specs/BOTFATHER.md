@@ -132,6 +132,8 @@ Russian:
 /start — показать приветствие
 /help — показать эту справку
 
+Репозиторий: https://github.com/ihoru/telegram-tts-bot
+
 Политика конфиденциальности: http://telegram-tts-bot.iho.su/
 ```
 
@@ -149,6 +151,8 @@ The bot works only in private chats. It is strongest in Russian; the quality of 
 
 /start — show the welcome message
 /help — show this help
+
+Repository: https://github.com/ihoru/telegram-tts-bot
 
 Privacy policy: http://telegram-tts-bot.iho.su/
 ```

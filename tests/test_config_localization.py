@@ -189,9 +189,11 @@ def test_start_and_help_copy_match_the_accepted_profile() -> None:
     assert "подписи к фото" in message_text(Locale.RU, MessageKey.HELP)
     assert "photo, video, or file caption" in message_text(Locale.EN, MessageKey.HELP)
     assert message_text(Locale.RU, MessageKey.HELP).endswith(
+        "Репозиторий: https://github.com/ihoru/telegram-tts-bot\n\n"
         "Политика конфиденциальности: http://telegram-tts-bot.iho.su/"
     )
     assert message_text(Locale.EN, MessageKey.HELP).endswith(
+        "Repository: https://github.com/ihoru/telegram-tts-bot\n\n"
         "Privacy policy: http://telegram-tts-bot.iho.su/"
     )
 
