@@ -156,7 +156,7 @@ jobs:
           images: ${{ steps.release.outputs.image }}
           flavor: latest=false
           labels: |
-            org.opencontainers.image.licenses=GPL-3.0-or-later AND CC-BY-NC-SA-4.0 AND Apache-2.0
+            org.opencontainers.image.licenses=GPL-3.0-or-later AND CC-BY-NC-SA-4.0 AND Apache-2.0 AND MIT
           tags: |
             type=semver,pattern={{version}}
             type=sha,format=long,prefix=

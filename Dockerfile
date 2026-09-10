@@ -17,7 +17,10 @@ ENV SOURCE_DATE_EPOCH=0 \
 
 WORKDIR /app
 COPY --from=uv /uv /uvx /usr/local/bin/
-COPY pyproject.toml uv.lock README.md LICENSE ./
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-install-project --no-editable
+COPY README.md LICENSE ./
 COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable
