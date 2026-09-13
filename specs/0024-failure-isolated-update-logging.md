@@ -1,7 +1,7 @@
 ---
 id: "0024"
 title: Failure-isolated incoming update logging
-status: accepted
+status: implemented
 created: 2026-09-13
 updated: 2026-09-13
 supersedes: "0018"
@@ -68,6 +68,9 @@ for disabled logging, successful nested serialization, and serialization failure
 Recheck the original forward with the user through the temporary debug runner.
 
 ## Delivery and rollback
+
+Implemented by commit `c2234e0`, titled
+`fix: prevent update logging from dropping forwarded messages`.
 
 Deliver the middleware fix with its tests. No migration is required. Reverting restores
 the known risk of dropping updates with link-preview metadata.
