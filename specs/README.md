@@ -40,12 +40,13 @@ Statuses are `draft`, `accepted`, `implemented`, `rejected`, and `superseded`.
 | 0015 | Visible active-render progress | draft | - |
 | 0016 | Per-user voice and speed profiles | draft | - |
 | 0017 | Rich text and media-caption input | accepted | - |
-| 0018 | Debug incoming update and handler logging | accepted | - |
+| 0018 | Debug incoming update and handler logging | superseded | 0024 |
 | 0019 | Read Aloud rebrand | accepted | - |
 | 0020 | Text length feedback | accepted | - |
 | 0021 | Repository link in help | implemented | - |
 | 0022 | Main branch Docker deployment over restricted SSH | superseded | 0023 |
 | 0023 | Publish-only deployment bootstrap and access verification | accepted | - |
+| 0024 | Failure-isolated incoming update logging | implemented | - |
 
 `BOTFATHER.md` contains the operational profile pack accepted by the current numbered
 specification. Changes to that pack require a new numbered specification.
