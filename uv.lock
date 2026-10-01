@@ -579,19 +579,20 @@ wheels = [
 
 [[package]]
 name = "faster-qwen3-tts"
-version = "0.4.0"
+version = "0.5.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
     { name = "numpy" },
     { name = "qwen-tts-hf" },
+    { name = "qwentts-cpp-python", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'" },
     { name = "soundfile" },
     { name = "torch" },
     { name = "transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/34/82/dde40fe2fb552eb52c767f6a64b0c98b9b7586eb65bb2aa82e595c9b1e32/faster_qwen3_tts-0.4.0.tar.gz", hash = "sha256:6f088186aaf92b7b8e3f35250cca112e9da037835d03784d26975a3ef533ebf2", size = 94690, upload-time = "2026-08-25T13:45:00.034Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1a/d8/84f7ce029142cddb5e645d5ea95dfec52a3e9e62477c9b3d1557c22d939d/faster_qwen3_tts-0.5.2.tar.gz", hash = "sha256:1846fd6ead45fa44f019dfcbb3c60c2d858f8ff3f2ce4c00fb7d8657b97dda49", size = 96747, upload-time = "2026-09-25T13:43:35.463Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/4c/f18001de4637997c35303fe47b46b99e655387d3980d260a39dd5289eaae/faster_qwen3_tts-0.4.0-py3-none-any.whl", hash = "sha256:96e1d83bb44414f3c48eeb100d2453f3005752556153d460dd471c4910047509", size = 43141, upload-time = "2026-08-25T13:44:58.458Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/c4/9889192a71c9ba6d8604045c9db4fe0515227cdc6620a454eb63d187b385/faster_qwen3_tts-0.5.2-py3-none-any.whl", hash = "sha256:23ce6e6187c6df1ee444cfea919f382d6dfaed610fc6e1c83fd0a303ef83a3d8", size = 44042, upload-time = "2026-09-25T13:43:34.135Z" },
 ]
 
 [[package]]
@@ -1834,6 +1835,18 @@ wheels = [
 ]
 
 [[package]]
+name = "qwentts-cpp-python"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huggingface-hub" },
+    { name = "numpy" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/96/37/8ba17242cfc7434687f35e9089a44fd1392efd3121952fb6d659f0b38dd8/qwentts_cpp_python-0.5.0-py3-none-macosx_14_0_arm64.whl", hash = "sha256:04546453b573afc5f0fbc8ba3c8fc810fef6367c4b603b9b5a1ef0dd459ed1a9", size = 1259944, upload-time = "2026-09-30T22:01:32.98Z" },
+]
+
+[[package]]
 name = "regex"
 version = "2026.7.19"
 source = { registry = "https://pypi.org/simple" }
@@ -2158,7 +2171,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiogram", specifier = ">=3.31.0,<4" },
-    { name = "faster-qwen3-tts", specifier = "==0.4.0" },
+    { name = "faster-qwen3-tts", specifier = "==0.5.2" },
     { name = "numpy", specifier = "==2.4.2" },
     { name = "python-dotenv", specifier = ">=1.2.1,<2" },
     { name = "torch", specifier = "==2.13.0", index = "https://download.pytorch.org/whl/cu130" },
