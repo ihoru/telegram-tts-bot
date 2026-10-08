@@ -2,7 +2,7 @@
 
 # This project deliberately publishes linux/amd64 only. Both source images resolve to
 # amd64 manifests, not mutable multi-platform indexes.
-FROM ghcr.io/astral-sh/uv:0.12.5@sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1 AS uv
+FROM ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 AS uv
 
 FROM scratch AS voice
 ADD --checksum=sha256:50081637b602126ee06cb3bc8a744d25651d2da149ee8864b9a379bfdd934437 \
