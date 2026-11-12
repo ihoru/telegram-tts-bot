@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -166,7 +166,7 @@ class StubProgress:
         self.notices.append((kwargs["user_id"], kwargs["kind"], kwargs["text"]))
 
     @asynccontextmanager
-    async def rendering(self, _target: ReplyTarget) -> AsyncIterator[None]:
+    async def rendering(self, _target: ReplyTarget) -> AsyncGenerator[None]:
         self.events.append("rendering_enter")
         try:
             yield

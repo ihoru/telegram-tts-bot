@@ -1,10 +1,11 @@
 ---
 id: "0025"
 title: Separate CPU Silero and GPU Qwen runtimes
-status: implemented
+status: superseded
 created: 2026-11-12
 updated: 2026-11-12
 supersedes: ["0008", "0023"]
+superseded_by: ["0026", "0027"]
 ---
 
 # SPEC-0025: Separate CPU Silero and GPU Qwen runtimes
