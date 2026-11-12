@@ -1,7 +1,7 @@
 ---
 id: "0027"
 title: GPU Torch dependency refresh
-status: accepted
+status: implemented
 created: 2026-11-12
 updated: 2026-11-12
 supersedes: ["0025"]
@@ -25,6 +25,13 @@ Update the GPU final-image assertion to check the new exact version.
   rendering. GPU inference remains dependent on suitable GPU hardware.
 - Preserve the official CPU and CUDA indexes, hashed artifacts, and exclusive extras.
 - Merge only after the updated PR head passes CI.
+
+## Implementation
+
+Implemented in [840ef94](https://github.com/ihoru/telegram-tts-bot/commit/840ef94a6e41e976b8d79de6e63be58224fc3671).
+The combined locked Ruff, formatting, mypy and fake-test checks pass with 239 tests
+passed and eight skipped. Container CI is the merge gate; publication, deployment
+and real Qwen GPU inference remain separate verification states.
 
 ## Open questions
 
