@@ -22,11 +22,16 @@ classifiers = [
 ]
 dependencies = [
   "aiogram>=3.31.0,<4",
-  "faster-qwen3-tts==0.4.0",
   "numpy==2.4.2",
   "python-dotenv>=1.2.1,<2",
-  "torchaudio==2.11.0",
-  "torch==2.14.0",
+]
+
+[project.optional-dependencies]
+cpu = ["torch==2.13.0+cpu"]
+gpu = [
+  "faster-qwen3-tts==0.4.0",
+  "torchaudio==2.11.0+cu130",
+  "torch==2.14.0+cu130",
 ]
 
 [project.scripts]
@@ -34,6 +39,7 @@ tts-to-ogg = "telegram_tts_bot.cli.tts_to_ogg:main"
 
 [dependency-groups]
 dev = [
+  "soundfile==0.14.0",
   "mypy>=1.18.2,<3",
   "pre-commit>=4.3.0,<5",
   "pytest>=8.4.2,<10",
@@ -44,10 +50,19 @@ dev = [
 
 [tool.uv]
 default-groups = ["dev"]
+conflicts = [[{ extra = "cpu" }, { extra = "gpu" }]]
 
 [tool.uv.sources]
-torchaudio = { index = "pytorch-cu130" }
-torch = { index = "pytorch-cu130" }
+torchaudio = { index = "pytorch-cu130", extra = "gpu" }
+torch = [
+  { index = "pytorch-cpu", extra = "cpu" },
+  { index = "pytorch-cu130", extra = "gpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-cu130"

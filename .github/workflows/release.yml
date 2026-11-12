@@ -55,16 +55,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Free disk space for CUDA image
-        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: false
       - name: Report available disk space
         run: df -h /
       - name: Set up Docker Buildx
@@ -73,16 +63,16 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          target: test
+          target: test-cpu
           platforms: linux/amd64
           load: true
           push: false
-          tags: telegram-tts-bot:test
-          cache-from: type=gha,scope=test
-          cache-to: type=gha,mode=max,scope=test
+          tags: telegram-tts-bot:test-cpu
+          cache-from: type=gha,scope=test-cpu
+          cache-to: type=gha,mode=max,scope=test-cpu
       - name: Run real-model integration tests
         run: >-
-          docker run --rm telegram-tts-bot:test
+          docker run --rm telegram-tts-bot:test-cpu
           /app/.venv/bin/pytest --no-cov
           -m "integration and not stress" -s
       - name: Run two shared Silero renders under host limits
@@ -94,7 +84,7 @@ jobs:
             --memory 1g \
             --memory-swap 1g \
             --entrypoint /usr/bin/time \
-            telegram-tts-bot:test \
+            telegram-tts-bot:test-cpu \
             -v /app/.venv/bin/pytest --no-cov \
             tests/speech/test_real_model.py::test_two_shared_model_renders_complete_under_resource_limit \
             -s
@@ -156,11 +146,14 @@ jobs:
           images: ${{ steps.release.outputs.image }}
           flavor: latest=false
           labels: |
-            org.opencontainers.image.licenses=GPL-3.0-or-later AND CC-BY-NC-SA-4.0 AND Apache-2.0
+            org.opencontainers.image.licenses=GPL-3.0-or-later AND CC-BY-NC-SA-4.0 AND Apache-2.0 AND MIT
           tags: |
             type=semver,pattern={{version}}
             type=sha,format=long,prefix=
             type=raw,value=latest
+            type=raw,value=${{ steps.release.outputs.version }}-gpu
+            type=raw,value=${{ github.sha }}-gpu
+            type=raw,value=latest-gpu
       - name: Build release image without publishing
         id: image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -175,8 +168,8 @@ jobs:
           build-args: |
             APP_VERSION=${{ steps.release.outputs.version }}
             VCS_REF=${{ github.sha }}
-          cache-from: type=gha,scope=runtime
-          cache-to: type=gha,mode=max,scope=runtime
+          cache-from: type=gha,scope=runtime-gpu
+          cache-to: type=gha,mode=max,scope=runtime-gpu
       - name: Verify the exact release image
         run: >-
           ./scripts/verify-runtime-image.sh
@@ -231,6 +224,88 @@ jobs:
           subject-digest: ${{ steps.digest.outputs.digest }}
           sbom-path: telegram-tts-bot-container.spdx.json
           push-to-registry: true
+      - name: Generate image metadata
+        id: metadata-cpu
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ steps.release.outputs.image }}
+          flavor: latest=false
+          labels: |
+            org.opencontainers.image.licenses=GPL-3.0-or-later AND CC-BY-NC-SA-4.0 AND Apache-2.0 AND MIT
+          tags: |
+            type=semver,pattern={{version}},suffix=-cpu
+            type=sha,format=long,prefix=,suffix=-cpu
+            type=raw,value=latest-cpu
+      - name: Build release image without publishing
+        id: image-cpu
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          target: runtime-cpu
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ steps.metadata-cpu.outputs.tags }}
+          labels: ${{ steps.metadata-cpu.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.release.outputs.version }}
+            VCS_REF=${{ github.sha }}
+          cache-from: type=gha,scope=runtime-cpu
+          cache-to: type=gha,mode=max,scope=runtime-cpu
+      - name: Verify the exact release image
+        run: >-
+          ./scripts/verify-runtime-image.sh
+          "${{ steps.release.outputs.image }}:${{ steps.release.outputs.version }}-cpu" cpu
+      - name: Push verified image tags
+        shell: bash
+        env:
+          IMAGE_TAGS: ${{ steps.metadata-cpu.outputs.tags }}
+        run: |
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              docker push "$tag"
+            fi
+          done <<<"$IMAGE_TAGS"
+      - name: Resolve and verify the published digest
+        id: digest-cpu
+        shell: bash
+        env:
+          IMAGE_TAGS: ${{ steps.metadata-cpu.outputs.tags }}
+          VERSION_TAG: ${{ steps.release.outputs.image }}:${{ steps.release.outputs.version }}-cpu
+        run: |
+          digest=$(docker buildx imagetools inspect "$VERSION_TAG" --format '{{.Manifest.Digest}}')
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Published image did not resolve to a SHA-256 digest." >&2
+            exit 1
+          fi
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              tag_digest=$(docker buildx imagetools inspect "$tag" --format '{{.Manifest.Digest}}')
+              test "$tag_digest" = "$digest"
+            fi
+          done <<<"$IMAGE_TAGS"
+          printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - name: Attest image provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.release.outputs.image }}
+          subject-digest: ${{ steps.digest-cpu.outputs.digest }}
+          push-to-registry: true
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ${{ steps.release.outputs.image }}@${{ steps.digest-cpu.outputs.digest }}
+          format: spdx-json
+          output-file: telegram-tts-bot-container-cpu.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Attest image SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.release.outputs.image }}
+          subject-digest: ${{ steps.digest-cpu.outputs.digest }}
+          sbom-path: telegram-tts-bot-container-cpu.spdx.json
+          push-to-registry: true
       - name: Build Python release artifacts
         run: uv build
       - name: Create GitHub release
@@ -238,7 +313,7 @@ jobs:
         with:
           files: |
             dist/*
-            telegram-tts-bot-container.spdx.json
+            telegram-tts-bot-container*.spdx.json
           fail_on_unmatched_files: true
           generate_release_notes: true
           make_latest: true

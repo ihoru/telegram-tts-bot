@@ -90,6 +90,39 @@ async def test_debug_update_logging_omits_null_values(
     assert caplog.messages == ['incoming_update payload={"update_id":17}']
 
 
+@pytest.mark.parametrize("log_level", [logging.INFO, logging.DEBUG])
+async def test_update_serialization_failure_does_not_block_handler(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    log_level: int,
+) -> None:
+    serialization_calls = 0
+    handler_calls = 0
+
+    def fail_serialization(_self: Update, **_kwargs: Any) -> str:
+        nonlocal serialization_calls
+        serialization_calls += 1
+        raise ValueError("sensitive payload must not be logged")
+
+    async def next_handler(_event: TelegramObject, _data: dict[str, Any]) -> str:
+        nonlocal handler_calls
+        handler_calls += 1
+        await asyncio.sleep(0)
+        return "handled"
+
+    monkeypatch.setattr(Update, "model_dump_json", fail_serialization)
+    with caplog.at_level(log_level, logger="telegram_tts_bot.activity"):
+        assert await UpdateLoggingMiddleware()(next_handler, Update(update_id=17), {}) == "handled"
+
+    assert handler_calls == 1
+    assert serialization_calls == (1 if log_level == logging.DEBUG else 0)
+    assert caplog.messages == (
+        ["incoming_update_serialization_failed exception_type=ValueError"]
+        if log_level == logging.DEBUG
+        else []
+    )
+
+
 async def test_debug_handler_logging_names_selected_handler(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

@@ -9,7 +9,7 @@ ADD --checksum=sha256:50081637b602126ee06cb3bc8a744d25651d2da149ee8864b9a379bfdd
     https://models.silero.ai/models/tts/ru/v5_5_ru.pt \
     /voice/v5_5_ru.pt
 
-FROM python:3.14.7-slim-bookworm@sha256:416f0db2a2b561945630cef9877a7ea0581b27449eb9fd9df42f03e1b74b5b63 AS build
+FROM python:3.14.7-slim-bookworm@sha256:416f0db2a2b561945630cef9877a7ea0581b27449eb9fd9df42f03e1b74b5b63 AS build-base
 
 ENV SOURCE_DATE_EPOCH=0 \
     UV_LINK_MODE=copy \
@@ -17,29 +17,57 @@ ENV SOURCE_DATE_EPOCH=0 \
 
 WORKDIR /app
 COPY --from=uv /uv /uvx /usr/local/bin/
-COPY pyproject.toml uv.lock README.md LICENSE ./
+COPY pyproject.toml uv.lock ./
+
+# Cache each complete runtime's dependencies before application source changes.
+FROM build-base AS dependencies-gpu
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --extra gpu --no-install-project --no-editable
+
+FROM build-base AS dependencies-cpu
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --extra cpu --no-install-project --no-editable
+
+FROM dependencies-gpu AS build
+COPY README.md LICENSE ./
 COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --no-editable
+    uv sync --locked --no-dev --extra gpu --no-editable
 
-FROM build AS test
+FROM dependencies-cpu AS build-cpu
+COPY README.md LICENSE ./
+COPY src ./src
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --extra cpu --no-editable
+
+FROM build-base AS test-base
 
 COPY docker/debian.sources /etc/apt/sources.list.d/debian.sources
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
         ca-certificates ffmpeg sox time \
     && rm -rf /var/lib/apt/lists/*
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --all-groups --no-editable
+COPY README.md LICENSE ./
+COPY src ./src
 COPY --from=voice /voice /opt/silero
 COPY tests ./tests
 COPY scripts ./scripts
 ENV SILERO_MODEL_PATH=/opt/silero/v5_5_ru.pt \
     TTS_VOICE=kseniya \
     TTS_MAX_CONCURRENCY=2
-CMD ["uv", "run", "--locked", "pytest"]
+CMD ["/app/.venv/bin/pytest"]
 
-FROM python:3.14.7-slim-bookworm@sha256:416f0db2a2b561945630cef9877a7ea0581b27449eb9fd9df42f03e1b74b5b63 AS runtime
+FROM test-base AS test
+COPY --from=build /app/.venv /app/.venv
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --extra gpu --no-editable
+
+FROM test-base AS test-cpu
+COPY --from=build-cpu /app/.venv /app/.venv
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --extra cpu --no-editable
+
+FROM python:3.14.7-slim-bookworm@sha256:416f0db2a2b561945630cef9877a7ea0581b27449eb9fd9df42f03e1b74b5b63 AS runtime-base
 
 ARG APP_UID=10001
 ARG APP_VERSION=0.1.0
@@ -61,7 +89,6 @@ RUN apt-get update \
         --home-dir /nonexistent --shell /usr/sbin/nologin ttsbot
 
 WORKDIR /app
-COPY --from=build --chown=${APP_UID}:${APP_UID} /app/.venv /app/.venv
 COPY --from=voice --chown=${APP_UID}:${APP_UID} /voice/v5_5_ru.pt /opt/silero/
 COPY LICENSE THIRD_PARTY_NOTICES.md licenses/silero-models-CC-BY-NC-SA-4.0.txt \
     licenses/faster-qwen3-tts-MIT.txt \
@@ -85,3 +112,14 @@ ENV HOME=/nonexistent \
 USER ${APP_UID}:${APP_UID}
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["python", "-m", "telegram_tts_bot"]
+
+# The CPU target copies a CPU-only environment; it never inherits GPU layers.
+FROM runtime-base AS runtime-cpu
+LABEL io.iho.tts.runtime="cpu"
+COPY --from=build-cpu --chown=${APP_UID}:${APP_UID} /app/.venv /app/.venv
+ENV TTS_VOICE=xenia
+
+# Keep the last/default target and historical runtime name compatible with GPU users.
+FROM runtime-base AS runtime
+LABEL io.iho.tts.runtime="gpu"
+COPY --from=build --chown=${APP_UID}:${APP_UID} /app/.venv /app/.venv

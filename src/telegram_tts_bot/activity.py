@@ -133,10 +133,18 @@ class UpdateLoggingMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        logger.debug(
-            "incoming_update payload=%s",
-            event.model_dump_json(by_alias=True, exclude_none=True),
-        )
+        if logger.isEnabledFor(logging.DEBUG):
+            try:
+                payload = event.model_dump_json(
+                    by_alias=True, exclude_none=True, exclude_unset=True
+                )
+            except Exception as error:
+                logger.warning(
+                    "incoming_update_serialization_failed exception_type=%s",
+                    type(error).__name__,
+                )
+            else:
+                logger.debug("incoming_update payload=%s", payload)
         return await handler(event, data)
 
 

@@ -28,12 +28,16 @@ The supported development platform is Linux x86-64 with Python 3.14, uv, FFmpeg,
 SoX. Real Qwen inference additionally needs an NVIDIA BF16-capable GPU.
 
 ```bash
-uv sync --locked --all-groups
+uv sync --locked --extra gpu
 uv run pre-commit install
 ```
 
+For CPU Silero use `uv sync --locked --extra cpu` instead; the profiles are mutually
+exclusive. Fake-only development needs neither extra. Launchers default to GPU; set
+`TTS_RUNTIME=cpu` and a Silero `TTS_VOICE` when using a CPU environment.
+
 For a one-time in-place migration from the former `qwen-tts` distribution, run
-`uv sync --locked --all-groups --reinstall-package qwen-tts-hf`. Both distributions
+`uv sync --locked --extra gpu --reinstall-package qwen-tts-hf`. Both distributions
 provide the same `qwen_tts` import path, so uninstalling the former package can remove
 files installed by its replacement. Fresh environments use the ordinary sync command.
 
@@ -42,8 +46,8 @@ integration work. Qwen provisioning reports human-readable per-file download siz
 stderr and handles Ctrl+C with exit status 130 and staging cleanup:
 
 ```bash
-uv run python -m telegram_tts_bot.speech.qwen_model
-uv run python -m telegram_tts_bot.speech.model --output-dir .models/silero
+uv run --extra gpu python -m telegram_tts_bot.speech.qwen_model
+uv run --extra cpu python -m telegram_tts_bot.speech.model --output-dir .models/silero
 ```
 
 Long Qwen `tts-to-ogg` renders report content-free model-load and 500-character chunk

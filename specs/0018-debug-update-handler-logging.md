@@ -1,10 +1,11 @@
 ---
 id: "0018"
 title: Debug incoming update and handler logging
-status: accepted
+status: superseded
 created: 2026-09-03
 updated: 2026-09-03
 supersedes: null
+superseded_by: "0024"
 ---
 
 # SPEC-0018: Debug incoming update and handler logging

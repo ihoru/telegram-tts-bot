@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -400,6 +401,10 @@ async def test_private_and_text_filters_ignore_groups_and_accept_text_content() 
     ("content", "expected_text"),
     [
         ({"text": "Прочитай это"}, "Прочитай это"),
+        (
+            {"text": "Read this link", "link_preview_options": {"is_disabled": True}},
+            "Read this link",
+        ),
         ({"caption": "Озвучь эту подпись"}, "Озвучь эту подпись"),
         (
             {
@@ -426,11 +431,15 @@ async def test_private_and_text_filters_ignore_groups_and_accept_text_content() 
         ),
     ],
 )
+@pytest.mark.parametrize("log_level", [logging.INFO, logging.DEBUG])
 async def test_dispatcher_routes_real_private_message_model(
+    caplog: pytest.LogCaptureFixture,
+    log_level: int,
     monkeypatch: pytest.MonkeyPatch,
     content: dict[str, Any],
     expected_text: str,
 ) -> None:
+    caplog.set_level(log_level, logger="telegram_tts_bot.activity")
     service = StubSpeechService(StubJob(rendered()))
     progress = StubProgress()
     dispatcher = create_dispatcher(
@@ -478,6 +487,15 @@ async def test_dispatcher_routes_real_private_message_model(
         await dispatcher.feed_update(bot, update)
     finally:
         await bot.session.close()
+
+    payload_logs = [line for line in caplog.messages if line.startswith("incoming_update payload=")]
+    if log_level == logging.DEBUG:
+        assert len(payload_logs) == 1
+        payload = json.loads(payload_logs[0].removeprefix("incoming_update payload="))
+        if "link_preview_options" in content:
+            assert payload["message"]["link_preview_options"] == {"is_disabled": True}
+    else:
+        assert payload_logs == []
 
     assert service.calls == [(88, expected_text)]
     assert sent_voices == [(88, "Qwen3-TTS (aiden) · render 5.123 s · queue 2.417 s")]
