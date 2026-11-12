@@ -9,7 +9,7 @@ ADD --checksum=sha256:50081637b602126ee06cb3bc8a744d25651d2da149ee8864b9a379bfdd
     https://models.silero.ai/models/tts/ru/v5_5_ru.pt \
     /voice/v5_5_ru.pt
 
-FROM python:3.15.0-slim-bookworm@sha256:0e019bbdfb5d9874cb2389f1c2884b64aa2ac97c99960b5bc521cef978c0617d AS build-base
+FROM python:3.14.7-slim-bookworm@sha256:416f0db2a2b561945630cef9877a7ea0581b27449eb9fd9df42f03e1b74b5b63 AS build-base
 
 ENV SOURCE_DATE_EPOCH=0 \
     UV_LINK_MODE=copy \
@@ -67,7 +67,7 @@ COPY --from=build-cpu /app/.venv /app/.venv
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --extra cpu --no-editable
 
-FROM python:3.15.0-slim-bookworm@sha256:0e019bbdfb5d9874cb2389f1c2884b64aa2ac97c99960b5bc521cef978c0617d AS runtime-base
+FROM python:3.14.7-slim-bookworm@sha256:416f0db2a2b561945630cef9877a7ea0581b27449eb9fd9df42f03e1b74b5b63 AS runtime-base
 
 ARG APP_UID=10001
 ARG APP_VERSION=0.1.0
