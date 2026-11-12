@@ -5,6 +5,15 @@ image, redistributes third-party software and model assets under their own terms
 summary is informational; the upstream license text and package metadata are
 authoritative.
 
+## Runtime flavors
+
+The CPU image installs only the Silero/PyTorch CPU stack: no Qwen runtime, TorchAudio,
+transformers, soundfile, NVIDIA CUDA or Triton distributions. The GPU image retains the
+Qwen/CUDA stack and Silero. Both include the notices and license texts below; Qwen and
+CUDA component descriptions apply to the GPU flavor. Each release includes a separate
+SPDX inventory and attestations for each actual image. `uv.lock` covers both mutually
+exclusive extras and development dependencies, rather than describing one image.
+
 ## Qwen3-TTS model and inference package
 
 - Creator: Qwen Team, Alibaba Cloud
@@ -15,7 +24,7 @@ authoritative.
 - Use: local mixed Russian-English synthesis with the `Aiden` or `Serena` speaker
 - License: Apache License 2.0
 
-The production image contains the inference package but not the model snapshot. The
+The GPU production image contains the inference package but not the model snapshot. The
 explicit provisioner downloads and verifies the complete eleven-file snapshot before
 runtime. The Apache 2.0 text distributed with the Qwen inference code is retained in
 [`licenses/qwen3-tts-Apache-2.0.txt`](licenses/qwen3-tts-Apache-2.0.txt).
