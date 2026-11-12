@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 import tempfile
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from time import perf_counter
@@ -98,7 +98,7 @@ def _write_output(path: Path, data: bytes, *, force: bool) -> None:
 
 
 @contextmanager
-def _qwen_progress_to_stderr() -> Iterator[None]:
+def _qwen_progress_to_stderr() -> Generator[None]:
     logger = logging.getLogger(_QWEN_LOGGER_NAME)
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(logging.Formatter("tts-to-ogg: %(message)s"))

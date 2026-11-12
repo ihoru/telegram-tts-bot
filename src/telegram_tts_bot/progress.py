@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -127,7 +127,7 @@ class TelegramProgressCoordinator:
         await self._safe_reply(target, text, response_kind=kind)
 
     @asynccontextmanager
-    async def rendering(self, target: ReplyTarget) -> AsyncIterator[None]:
+    async def rendering(self, target: ReplyTarget) -> AsyncGenerator[None]:
         """Hold one reference on the chat-scoped active-render activity loop."""
         key: tuple[Bot, int] | None = None
         bot = target.bot
