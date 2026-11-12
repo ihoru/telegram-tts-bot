@@ -47,7 +47,7 @@ Statuses are `draft`, `accepted`, `implemented`, `rejected`, and `superseded`.
 | 0022 | Main branch Docker deployment over restricted SSH | superseded | 0023 |
 | 0023 | Publish-only deployment bootstrap and access verification | superseded | 0025 |
 | 0024 | Failure-isolated incoming update logging | implemented | - |
-| 0025 | Separate CPU Silero and GPU Qwen runtimes | accepted | - |
+| 0025 | Separate CPU Silero and GPU Qwen runtimes | implemented | - |
 
 `BOTFATHER.md` contains the operational profile pack accepted by the current numbered
 specification. Changes to that pack require a new numbered specification.

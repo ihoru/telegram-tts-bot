@@ -1,7 +1,7 @@
 ---
 id: "0025"
 title: Separate CPU Silero and GPU Qwen runtimes
-status: accepted
+status: implemented
 created: 2026-11-12
 updated: 2026-11-12
 supersedes: ["0008", "0023"]
@@ -80,6 +80,13 @@ pruning rollback images/cache is a later explicit operator action.
 
 Separate lockfiles duplicate common dependency resolution. Removing CUDA files from a
 GPU image retains its layers. Installing both profiles defeats the CPU size contract.
+
+## Implementation
+
+Implemented in [e77b4be](https://github.com/ihoru/telegram-tts-bot/commit/e77b4befe182a0c168f3b29b44023f46092a440a). The PR integrates the current main
+logging fix and preserves source-independent dependency caching for each runtime.
+Local verification is recorded in [the runtime report](../docs/cpu-runtime-verification.md).
+Registry publication, CI execution and live rollout are separate delivery states.
 
 ## Open questions
 

@@ -3,7 +3,9 @@
 Local implementation of [SPEC-0025](../specs/0025-cpu-only-silero-runtime.md).
 CI execution, registry publication and production rollout are still pending. No server
 configuration, running production container or rollback image was changed or pruned.
-SPEC-0025 remains accepted until an implementing commit/release is recorded.
+SPEC-0025 is implemented by [e77b4be](https://github.com/ihoru/telegram-tts-bot/commit/e77b4befe182a0c168f3b29b44023f46092a440a).
+The initial artifact measurements below precede integration onto current main;
+the final PR integration checks are recorded in the last section.
 
 ## Final CPU artifact
 
@@ -75,3 +77,24 @@ running immutable revision, retain the known-good image and secure environment, 
 the verified CPU artifact, then follow [the migration procedure](../DEPLOYMENT.md).
 Verify the running digest, one real Telegram voice reply, polling conflicts and server
 Docker/filesystem usage before accepting deployment or pruning migration rollback.
+
+
+## PR integration on current main
+
+The PR branch starts at current main, including the failure-isolated logging fix and
+SPEC-0024. The original workspace's separate files were not included in this PR.
+Docker now caches each profile's complete dependencies before copying application
+source, preserving the recently merged container caching fix.
+
+- Required locked Ruff, formatting, mypy and pytest passed again: **239 passed,
+  8 skipped**, **91.27%** total coverage, host Python **3.14.10**. Commit hooks,
+  workflow actionlint and changed-script ShellCheck passed.
+- Rebuilt `runtime-cpu` as `telegram-tts-bot:cpu-pr-check`; full runtime verification
+  passed again, including actual offline xenia OGG/Opus rendering and profile exclusions.
+- Updated local image ID:
+  `sha256:b44ddcb65c98d82345a12f7f040fefc183c238f051eff10302a49fc554f3446a`.
+  Image: **1,551,141,191 bytes**; `/app/.venv`: **822,282,658 bytes**.
+- The initial GPU runtime/import and Silero integration/stress evidence above remains
+  the local baseline. CI will rebuild and verify both exact PR artifacts with the
+  source-independent dependency stages. This record does not claim remote CI success,
+  image publication or production deployment.
