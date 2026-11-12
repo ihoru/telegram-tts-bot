@@ -1,7 +1,8 @@
 ---
 id: "0008"
 title: Faster Qwen CUDA-graph runtime
-status: accepted
+status: superseded
+superseded_by: "0025"
 created: 2026-08-28
 updated: 2026-08-28
 supersedes: "0005"

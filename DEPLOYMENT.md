@@ -58,8 +58,8 @@ configuration, or logs.
 For CPU-only Silero, also set a Silero voice and the validated concurrency:
 
 ```dotenv
-TTS_VOICE=kseniya
-TTS_MAX_CONCURRENCY=2
+TTS_VOICE=xenia
+TTS_MAX_CONCURRENCY=1
 ```
 
 For Qwen, keep the default `TTS_VOICE=aiden`, or select `serena`, and keep
@@ -67,15 +67,21 @@ For Qwen, keep the default `TTS_VOICE=aiden`, or select `serena`, and keep
 
 ## Build the image
 
-From `/opt/telegram-tts-bot`, build the production target. Use a tag that identifies the checked
-out release or commit:
+From `/opt/telegram-tts-bot`, build the target for the selected runtime. Use a tag
+that identifies the checked out release or commit:
 
 ```bash
+# CPU Silero (xenia, concurrency one)
+docker build --platform linux/amd64 --target runtime-cpu -t telegram-tts-bot:release-cpu .
+scripts/verify-runtime-image.sh telegram-tts-bot:release-cpu cpu
+
+# GPU Qwen (historical target and defaults)
 docker build --platform linux/amd64 --target runtime -t telegram-tts-bot:release .
+scripts/verify-runtime-image.sh telegram-tts-bot:release gpu
 ```
 
-The final image is approximately 6.22 GB uncompressed. It runs as unprivileged numeric
-UID and GID `10001` and contains FFmpeg, SoX, the application, and the Silero model. Qwen
+The historical GPU image is approximately 6.22 GB uncompressed. Both flavors run as numeric
+UID and GID `10001` and contain FFmpeg, SoX, the application, and the Silero model. Qwen
 weights are deliberately excluded.
 
 ## Run on CPU with Silero
@@ -92,7 +98,7 @@ docker run --detach \
   --log-driver local \
   --log-opt max-size=10m \
   --log-opt max-file=3 \
-  telegram-tts-bot:release
+  telegram-tts-bot:release-cpu
 ```
 
 ## Run on an NVIDIA GPU with Qwen
@@ -190,3 +196,21 @@ the new instance, retain the previous image until rollback is no longer needed.
 To roll back, gracefully remove the current container and repeat the same run command
 with the previous immutable image tag. The environment and model mount require no data
 migration.
+
+## Migrate an existing Silero deployment to CPU
+
+Use [SPEC-0025](specs/0025-cpu-only-silero-runtime.md) and the
+[automatic deployment guide](docs/automatic-deployment.md). Reconcile the intended source
+revision with the live immutable image before building. Record the current image digest,
+container identity and root-only environment on the server without copying secrets into
+logs. Keep `TTS_VOICE=xenia` and `TTS_MAX_CONCURRENCY=1` explicit. Install the updated
+root-owned deployment script before enabling CPU deployment; its image-label check
+rejects a mismatched profile after pull and before stopping the current poller.
+
+Manually publish verified main images first; select the `main-SHA-cpu` digest for Silero.
+Only a subsequent enabled push deploys automatically. Keep the old container/image until
+startup, a real Telegram voice reply, absence of polling conflicts and running digest
+are verified. Compare `docker image inspect --format '{{.Size}}' IMAGE`,
+`docker system df` and `df -h /` before/after. The target is at least 3 GB less than the
+recorded 6.21 GB GPU production image. Do not prune migration rollback or build caches
+until the new deployment is accepted. No live rollout is implied by a local build.

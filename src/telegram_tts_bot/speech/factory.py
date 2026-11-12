@@ -1,9 +1,10 @@
 """Production speech composition."""
 
+import logging
 from pathlib import Path
 
 from telegram_tts_bot.speech.encoding import FfmpegVoiceEncoder
-from telegram_tts_bot.speech.qwen import QwenWaveSynthesizer
+from telegram_tts_bot.speech.errors import SynthesisError
 from telegram_tts_bot.speech.renderer import VoiceRenderer
 from telegram_tts_bot.speech.silero import SileroWaveSynthesizer
 from telegram_tts_bot.speech.types import WaveSynthesizer
@@ -20,6 +21,11 @@ def create_voice_renderer(
     encoder.verify_available()
     synthesizer: WaveSynthesizer
     if voice in {"aiden", "serena"}:
+        try:
+            from telegram_tts_bot.speech.qwen import QwenWaveSynthesizer
+        except ImportError:
+            logging.getLogger(__name__).error("qwen_runtime_dependencies_unavailable requires=gpu")
+            raise SynthesisError("Qwen requires the GPU runtime dependencies") from None
         synthesizer = QwenWaveSynthesizer.load(qwen_model_path, voice)
     else:
         synthesizer = SileroWaveSynthesizer.load(silero_model_path, voice)
