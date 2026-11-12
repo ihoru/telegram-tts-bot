@@ -15,7 +15,7 @@ def test_accelerated_qwen_runtime_is_installed_without_conflicting_distribution(
         runtime_version = version("faster-qwen3-tts")
     except PackageNotFoundError:
         pytest.skip("GPU runtime is not selected")
-    assert runtime_version == "0.4.0"
+    assert runtime_version == "0.5.4"
     assert version("qwen-tts-hf") == "0.1.1.post1"
     with pytest.raises(PackageNotFoundError):
         version("qwen-tts")

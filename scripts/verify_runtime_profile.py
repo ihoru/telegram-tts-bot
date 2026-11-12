@@ -81,7 +81,7 @@ else:
 
     assert importlib.util.find_spec("faster_qwen3_tts") is not None
     assert importlib.util.find_spec("qwen_tts") is not None
-    assert importlib.metadata.version("faster-qwen3-tts") == "0.4.0"
+    assert importlib.metadata.version("faster-qwen3-tts") == "0.5.4"
     assert importlib.metadata.version("qwen-tts-hf") == "0.1.1.post1"
     assert importlib.metadata.version("torchaudio") == "2.11.0+cu130"
     assert "qwen-tts" not in importlib.metadata.packages_distributions()["qwen_tts"]
