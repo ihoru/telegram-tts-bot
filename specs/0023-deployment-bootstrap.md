@@ -1,7 +1,8 @@
 ---
 id: "0023"
 title: Publish-only deployment bootstrap and access verification
-status: accepted
+status: superseded
+superseded_by: "0025"
 created: 2026-09-04
 updated: 2026-09-04
 supersedes: "0022"

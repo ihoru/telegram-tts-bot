@@ -2,6 +2,6 @@
 
 set -eu
 
-repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repository_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$repository_root"
-exec uv run --active python -m telegram_tts_bot "$@"
+exec uv run --active --extra "${TTS_RUNTIME:-gpu}" python -m telegram_tts_bot "$@"

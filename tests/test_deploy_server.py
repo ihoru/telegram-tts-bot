@@ -16,6 +16,7 @@ class FakeDocker:
         self.running = {deployment.CONTAINER}
         self.calls: list[tuple[str, ...]] = []
         self.fail = fail
+        self.profile = "cpu"
 
     def __call__(self, *arguments: str) -> str:
         self.calls.append(arguments)
@@ -24,6 +25,8 @@ class FakeDocker:
         if command == self.fail:
             self.fail = ""
             raise deployment.DeploymentError("Simulated Docker failure")
+        if command == "image":
+            return self.profile
         if command == "container":
             requested = arguments[4].removeprefix("name=^/").removesuffix("$")
             return requested if requested in self.containers else ""
@@ -166,3 +169,23 @@ def test_qwen_configuration_preserves_model_mount_and_gpu(tmp_path: Path) -> Non
     assert arguments[-1] == (
         f"type=bind,source={tmp_path},target=/models/qwen3-tts-12hz-0.6b-customvoice,readonly"
     )
+
+
+@pytest.mark.parametrize("profile", ["gpu", "", "unexpected"])
+def test_profile_mismatch_keeps_current_and_backup(docker: FakeDocker, profile: str) -> None:
+    docker.profile = profile
+    docker.containers[deployment.PREVIOUS] = "older"
+    with pytest.raises(deployment.DeploymentError, match="runtime does not match"):
+        deployment.deploy(IMAGE, [])
+    assert docker.running == {deployment.CONTAINER}
+    assert docker.containers[deployment.PREVIOUS] == "older"
+    assert not any(call[0] in {"stop", "rm", "run"} for call in docker.calls)
+
+
+def test_gpu_deploy_accepts_only_gpu_profile(docker: FakeDocker) -> None:
+    arguments = ["--gpus", "device=0"]
+    with pytest.raises(deployment.DeploymentError, match="runtime does not match"):
+        deployment.deploy(IMAGE, arguments)
+    docker.profile = "gpu"
+    deployment.deploy(IMAGE, arguments)
+    assert docker.containers[deployment.PREVIOUS] == "old"
