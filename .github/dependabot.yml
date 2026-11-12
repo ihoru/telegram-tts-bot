@@ -16,3 +16,9 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      # Python upgrades require coordinated project, lockfile, and CI changes.
+      - dependency-name: python
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
