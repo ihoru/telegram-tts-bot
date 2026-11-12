@@ -37,8 +37,10 @@ Edit `/etc/telegram-tts-bot/deploy.json` with `sudoedit`. For CPU Silero:
 ```
 
 Keep your existing `.env`, including `TELEGRAM_BOT_TOKEN`, voice, and concurrency.
-For example, xenia uses `TTS_VOICE=xenia` and `TTS_MAX_CONCURRENCY=2`.
-The Docker image defaults to Qwen, so a Silero voice must be explicit in `.env`.
+For the existing deployment keep `TTS_VOICE=xenia` and `TTS_MAX_CONCURRENCY=1`
+explicit. The CPU image defaults to those values. Silero uses the verified CPU digest;
+Qwen uses the GPU digest. Before stopping the poller the server verifies the image's
+`io.iho.tts.runtime` label against this root-owned configuration.
 Protect it with `chmod 600`; the deployment user must not be able to modify it or
 its parent directory. The root-owned deployment command reads it for Docker.
 
@@ -117,6 +119,7 @@ In **Settings → Secrets and variables → Actions**, add:
 | Repository variable | `DEPLOY_HOST` | Server IPv4 address or DNS name |
 | Repository variable | `DEPLOY_USER` | `tts-deploy` |
 | Repository variable | `DEPLOY_PORT` | SSH port; optional, defaults to `22` |
+| Repository variable | `DEPLOY_RUNTIME` | `cpu` (default) for Silero; `gpu` for Qwen |
 | Repository variable | `DEPLOY_ENABLED` | Leave unset until setup is complete; set to `true` to enable |
 | Secret | `DEPLOY_SSH_KEY` | Complete dedicated private key, including BEGIN/END lines |
 | Secret | `DEPLOY_KNOWN_HOSTS` | Verified server SSH host public key entry |
@@ -151,7 +154,7 @@ For server pulls choose one:
 1. Commit and push these repository changes with deployment disabled.
 2. Complete the server/key/GitHub setup and the harmless `check` command above.
 3. Bootstrap the registry using **Actions → CI → Run workflow**, selecting `main`.
-   This manual run executes the normal checks, publishes the verified image, and
+   This manual run executes the normal checks, publishes both verified runtime images, and
    verifies restricted SSH from a GitHub runner. It never replaces the bot, even
    when deployment is enabled. Other branches cannot publish or access production.
    Alternatively run `gh workflow run ci.yml --ref main --repo ihoru/telegram-tts-bot`.
@@ -160,7 +163,11 @@ For server pulls choose one:
    server. Never publish a running container with `docker commit`; use the CI image.
 4. Set repository variable `DEPLOY_ENABLED=true`. Changing the variable alone does
    not launch a deployment.
-5. Merge or push the next feature to `main` and follow **Actions → CI**. Lint, tests,
+5. Install the updated root-owned server script before this migration. CI publishes
+   `main-SHA-cpu` and `main-SHA-gpu`; historical `main-SHA` remains a GPU alias.
+   `DEPLOY_RUNTIME` selects the exact profile digest, with CPU as the default. A
+   mismatch with server `runtime` fails before downtime. The SSH command and privileges
+   are unchanged. Merge or push the next feature to `main` and follow **Actions → CI**. Lint, tests,
    container verification, image publication, and production deployment must succeed.
    PR and tag runs never deploy. Superseded main commits are skipped before SSH.
 6. On the server verify the running image's revision against that feature's commit:

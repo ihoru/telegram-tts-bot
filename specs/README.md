@@ -30,7 +30,7 @@ Statuses are `draft`, `accepted`, `implemented`, `rejected`, and `superseded`.
 | 0005 | Local Qwen Aiden and Serena with Silero fallback voices | superseded | 0008 |
 | 0006 | Chronological mixed-language audition archive | accepted | - |
 | 0007 | Visible local Qwen provisioning and render progress | accepted | - |
-| 0008 | Faster Qwen CUDA-graph runtime | accepted | - |
+| 0008 | Faster Qwen CUDA-graph runtime | superseded | 0025 |
 | 0009 | Qwen punctuation and CLI ergonomics | accepted | - |
 | 0010 | Bounded fair rendering queue and aggregated progress | accepted | - |
 | 0011 | Privacy-policy link in bot copy | accepted | - |
@@ -45,8 +45,9 @@ Statuses are `draft`, `accepted`, `implemented`, `rejected`, and `superseded`.
 | 0020 | Text length feedback | accepted | - |
 | 0021 | Repository link in help | implemented | - |
 | 0022 | Main branch Docker deployment over restricted SSH | superseded | 0023 |
-| 0023 | Publish-only deployment bootstrap and access verification | accepted | - |
+| 0023 | Publish-only deployment bootstrap and access verification | superseded | 0025 |
 | 0024 | Failure-isolated incoming update logging | implemented | - |
+| 0025 | Separate CPU Silero and GPU Qwen runtimes | accepted | - |
 
 `BOTFATHER.md` contains the operational profile pack accepted by the current numbered
 specification. Changes to that pack require a new numbered specification.
