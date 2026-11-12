@@ -102,6 +102,12 @@ def deploy(image: str, arguments: list[str]) -> None:
         if docker("inspect", "--format", "{{.State.Running}}", PREVIOUS) != "false":
             raise DeploymentError("Previous container is running; resolve this locally first.")
     docker("pull", image)
+    expected_profile = "gpu" if "--gpus" in arguments else "cpu"
+    profile = docker(
+        "image", "inspect", "--format", '{{ index .Config.Labels "io.iho.tts.runtime" }}', image
+    )
+    if profile != expected_profile:
+        raise DeploymentError("Image runtime does not match the configured server runtime.")
     if exists(PREVIOUS):
         docker("rm", PREVIOUS)
     try:

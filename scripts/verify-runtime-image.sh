@@ -1,12 +1,19 @@
 #!/bin/sh
 set -eu
 
-if [ "$#" -ne 1 ]; then
-  echo "usage: $0 IMAGE" >&2
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+  echo "usage: $0 IMAGE [cpu|gpu]" >&2
   exit 2
 fi
 
 image=$1
+profile=${2:-gpu}
+case "$profile" in cpu|gpu) ;; *) echo "Unknown runtime profile." >&2; exit 2 ;; esac
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+test "$(docker image inspect --format \
+  '{{ index .Config.Labels "io.iho.tts.runtime" }}' "$image")" = "$profile"
+docker image inspect --format 'runtime_image_bytes={{.Size}}' "$image"
+docker run --rm --entrypoint du "$image" -sb /app/.venv
 artifact_dir=$(mktemp -d)
 chmod 755 "$artifact_dir"
 container_id=
@@ -29,8 +36,8 @@ docker run --rm --entrypoint python "$image" -c \
 test "$(docker run --rm --entrypoint sha256sum "$image" \
   /opt/silero/v5_5_ru.pt | cut -d ' ' -f 1)" = \
   "50081637b602126ee06cb3bc8a744d25651d2da149ee8864b9a379bfdd934437"
-docker run --rm --entrypoint python "$image" -c \
-  "import importlib.metadata, importlib.util, os, torch; assert os.environ['QWEN_MODEL_PATH'] == '/models/qwen3-tts-12hz-0.6b-customvoice'; assert os.environ['SILERO_MODEL_PATH'] == '/opt/silero/v5_5_ru.pt'; assert os.environ['TTS_VOICE'] == 'aiden'; assert os.environ['TTS_MAX_CONCURRENCY'] == '1'; assert os.environ['HF_HUB_OFFLINE'] == '1'; assert os.environ['TRANSFORMERS_OFFLINE'] == '1'; assert 'PIPER_MODEL_PATH' not in os.environ; assert 'PIPER_CONFIG_PATH' not in os.environ; assert importlib.util.find_spec('piper') is None; assert importlib.util.find_spec('faster_qwen3_tts') is not None; assert importlib.util.find_spec('qwen_tts') is not None; assert importlib.metadata.version('faster-qwen3-tts') == '0.4.0'; assert importlib.metadata.version('qwen-tts-hf') == '0.1.1.post1'; assert all(name != 'qwen-tts' for name in importlib.metadata.packages_distributions()['qwen_tts']); assert torch.__version__ == '2.13.0+cu130'; assert torch.version.cuda == '13.0'"
+docker run --rm --network none --interactive --entrypoint python "$image" - "$profile" \
+  < "$script_dir/verify_runtime_profile.py"
 docker run --rm --entrypoint sh "$image" -c "test ! -e /opt/piper"
 docker run --rm --entrypoint sh "$image" -c \
   "test ! -e /models/qwen3-tts-12hz-0.6b-customvoice"
@@ -49,6 +56,7 @@ test "$(docker run --rm --entrypoint sha256sum "$image" \
 set +e
 timeout 60s docker run --rm --network none \
   --env "TELEGRAM_BOT_TOKEN=$smoke_token" \
+  --env TTS_VOICE=aiden \
   "$image" >"$artifact_dir/stdout" 2>"$artifact_dir/stderr"
 status=$?
 set -e
@@ -56,16 +64,20 @@ set -e
 cat "$artifact_dir/stderr"
 test "$status" = "1"
 grep -Fq "bot_stopped exception_type=" "$artifact_dir/stderr"
+if [ "$profile" = cpu ]; then
+  grep -Fq "qwen_runtime_dependencies_unavailable requires=gpu" "$artifact_dir/stderr"
+fi
 if grep -Fq "$smoke_token" "$artifact_dir/stderr"; then
   echo "Bot token leaked into startup diagnostics." >&2
   exit 1
 fi
 
 container_id=$(docker create --interactive \
-  --env TTS_VOICE=kseniya \
+  --network none \
+  --env TTS_VOICE=xenia \
   --env TTS_MAX_CONCURRENCY=2 \
   --entrypoint tts-to-ogg "$image" /tmp/voice.ogg)
-printf '%s' 'Проверка контейнера' | docker start --attach --interactive "$container_id"
+printf '%s' 'Проверка контейнера и mixed language API 123.' | docker start --attach --interactive "$container_id"
 docker cp "$container_id:/tmp/voice.ogg" "$artifact_dir/voice.ogg"
 chmod 644 "$artifact_dir/voice.ogg"
 docker rm "$container_id" >/dev/null

@@ -65,10 +65,10 @@ Local development is supported on Linux x86-64 and requires:
 
 Qwen requires an NVIDIA GPU with BF16 support. The verified baseline is 8 GiB VRAM,
 at least 8 GiB host RAM, and one concurrent render. Silero can run on CPU; its measured
-two-render baseline remains two CPUs and 1 GiB RAM. The production image is amd64 and
-contains the CUDA runtime and Silero model, but Qwen's roughly 2.5 GB snapshot is mounted
-separately rather than baked into the image. The validated runtime image is about 6.22 GB
-uncompressed. GPU containers also require the NVIDIA Container Toolkit on the host.
+two-render baseline remains two CPUs and 1 GiB RAM. Images are amd64. The CPU flavor
+contains only the Silero stack; the GPU flavor contains CUDA and Silero but mounts Qwen's roughly 2.5 GB snapshot separately. The
+historical GPU image measured about 6.22 GB uncompressed. GPU containers require the
+NVIDIA Container Toolkit on the host.
 
 ## Quick start
 
@@ -76,7 +76,7 @@ Clone the repository, create the locked development environment, and install the
 hook:
 
 ```bash
-uv sync --locked --all-groups
+uv sync --locked --extra gpu
 uv run pre-commit install
 ```
 
@@ -84,17 +84,22 @@ When upgrading an existing checkout from the former `qwen-tts` distribution, rep
 their shared `qwen_tts` import after the first sync:
 
 ```bash
-uv sync --locked --all-groups --reinstall-package qwen-tts-hf
+uv sync --locked --extra gpu --reinstall-package qwen-tts-hf
 ```
 
-Fresh environments need only the ordinary sync command above.
+Fresh GPU environments need only the ordinary sync command above. For Silero-only
+work use `uv sync --locked --extra cpu` instead. The extras conflict intentionally.
+Local launchers select GPU by default; use `TTS_RUNTIME=cpu TTS_VOICE=xenia bin/run_bot`
+or `TTS_RUNTIME=cpu TTS_VOICE=xenia bin/tts` for CPU. Direct `uv run` inference commands
+must include `--extra gpu` or `--extra cpu`; the default development environment has
+only the dependencies required for fake tests.
 
 Provision the exact pinned Qwen snapshot into the ignored local model directory. This
 downloads roughly 2.5 GB once, shows per-file progress with KiB/MiB/GiB units on stderr,
 and verifies every file before installing it:
 
 ```bash
-uv run python -m telegram_tts_bot.speech.qwen_model
+uv run --extra gpu python -m telegram_tts_bot.speech.qwen_model
 ```
 
 Press Ctrl+C once to cancel provisioning. The command closes the active download,
@@ -103,7 +108,7 @@ removes partial staging data, prints a concise cancellation message, and exits 1
 For a CPU-only Silero configuration, provision its pinned `v5_5_ru` model instead:
 
 ```bash
-uv run python -m telegram_tts_bot.speech.model --output-dir .models/silero
+uv run --extra cpu python -m telegram_tts_bot.speech.model --output-dir .models/silero
 ```
 
 Install FFmpeg and SoX with your operating-system package manager, then verify the
@@ -283,10 +288,12 @@ docker run --rm --init --gpus device=0 --env-file .env \
 ```
 
 The image runs as an unprivileged user, verifies the mounted Qwen snapshot before load,
-and contains the Silero fallback at `/opt/silero/v5_5_ru.pt`. A CPU-only Silero run sets
-`TTS_VOICE=kseniya` and may set `TTS_MAX_CONCURRENCY=2`; it does not need the Qwen mount
-or a GPU. Stop with `SIGTERM`; the bot drains active work before exiting. Exactly one
-polling replica may use a token at a time.
+and contains the Silero fallback at `/opt/silero/v5_5_ru.pt`. For the CPU-only image, build
+`docker build --platform linux/amd64 --target runtime-cpu -t telegram-tts-bot:local-cpu .`
+and run `telegram-tts-bot:local-cpu` without a model mount or GPU. Its defaults are
+`TTS_VOICE=xenia` and `TTS_MAX_CONCURRENCY=1`. Verify it with
+`scripts/verify-runtime-image.sh telegram-tts-bot:local-cpu cpu`. Stop with `SIGTERM`;
+the bot drains active work before exiting. Exactly one polling replica may use a token at a time.
 
 Test the baked renderer without starting Telegram:
 
@@ -328,8 +335,9 @@ publishing. Qwen's CUDA integration is exercised manually on a GPU host.
 
 Successful tags publish a non-root linux/amd64 image to GHCR with exact semver, commit
 SHA, and `latest` tags, then create a GitHub release containing the Python artifacts and
-an SPDX JSON SBOM. The image receives build-provenance and SBOM attestations. Releases do
-not deploy to a host.
+an SPDX JSON SBOM for each flavor. CPU tags have a `-cpu` suffix; GPU tags retain the
+existing names and add explicit `-gpu` aliases. Both exact images receive
+build-provenance and SBOM attestations. Releases do not deploy to a host.
 
 ## Troubleshooting
 
