@@ -33,7 +33,7 @@ runtime. The Apache 2.0 text distributed with the Qwen inference code is retaine
 
 - Creator: Andres Marafioti
 - Project: [andimarafioti/faster-qwen3-tts](https://github.com/andimarafioti/faster-qwen3-tts)
-- Package: `faster-qwen3-tts==0.4.0`
+- Package: `faster-qwen3-tts==0.5.4`
 - Use: local CUDA-graph acceleration for Qwen synthesis
 - License: MIT
 

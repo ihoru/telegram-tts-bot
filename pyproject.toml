@@ -29,7 +29,7 @@ dependencies = [
 [project.optional-dependencies]
 cpu = ["torch==2.13.0+cpu"]
 gpu = [
-  "faster-qwen3-tts==0.4.0",
+  "faster-qwen3-tts==0.5.4",
   "torchaudio==2.11.0+cu130",
   "torch==2.14.0+cu130",
 ]
